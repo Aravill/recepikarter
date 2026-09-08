@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recepikarter — Seznam receptů</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1b1815;
+    --bg-raised: #241f1a;
+    --line: #33302a;
+    --text: #efe9de;
+    --text-dim: #a89f8f;
+    --surface: #efe9de;
+    --surface-ink: #221f1c;
+    --surface-ink-dim: #6b6255;
+    --accent: #b8502a;
+    --easy: #6f8f5c;
+    --medium: #c98a2e;
+    --hard: #a1423a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  .screen {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .app-header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .app-title { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 19px; }
+  .fab {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fdf9f2;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .search-wrap { padding: 14px 18px 10px; background: var(--bg); flex: none; position: sticky; top: 65px; z-index: 2; }
+  .search-input {
+    width: 100%;
+    font: 400 14.5px 'IBM Plex Sans', sans-serif;
+    padding: 11px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--bg-raised);
+    color: var(--text);
+  }
+  .search-input::placeholder { color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  .pill-row { display: flex; gap: 8px; padding: 0 18px 14px; overflow-x: auto; flex: none; }
+  .pill {
+    flex: none;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    cursor: pointer;
+  }
+  .pill.active { border-color: var(--accent); color: var(--text); background: rgba(184,80,42,0.16); }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .sort-row { display: flex; align-items: center; justify-content: space-between; padding: 0 18px 10px; flex: none; }
+  .sort-row .count { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: var(--text-dim); }
+  .sort-row .sort-by { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: var(--text); background: none; border: none; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .list { flex: 1; padding: 2px 14px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .row {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 13px 14px 13px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-left: 4px solid var(--medium);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .row-main { flex: 1; min-width: 0; }
+  .row-name {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--surface-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row-meta {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--surface-ink-dim);
+    margin-top: 3px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .row-chevron { color: var(--surface-ink-dim); font-size: 17px; flex: none; }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="app-header">
+      <span class="app-title">Recepikarter</span>
+      <button class="fab" aria-label="Nový recept">+</button>
+    </div>
+    <div class="search-wrap">
+      <input class="search-input" placeholder="Hledat recept nebo ingredienci…" />
+    </div>
+    <div class="pill-row">
+      <button class="pill active">Vše</button>
+      <button class="pill">Hlavní jídlo</button>
+      <button class="pill">Polévka</button>
+      <button class="pill">Sladké</button>
+      <button class="pill"><span class="dot" style="background:var(--easy)"></span>Snadné</button>
+      <button class="pill"><span class="dot" style="background:var(--medium)"></span>Střední</button>
+      <button class="pill"><span class="dot" style="background:var(--hard)"></span>Těžké</button>
+    </div>
+    <div class="sort-row">
+      <span class="count">12 receptů</span>
+      <button class="sort-by">Řadit: naposledy upraveno ▾</button>
+    </div>
+    <div class="list">
+      <a class="row" style="border-left-color:var(--hard)">
+        <div class="row-main">
+          <div class="row-name">Svíčková na smetaně</div>
+          <div class="row-meta"><span>Hlavní jídlo</span><span>·</span><span>180 min</span><span>·</span><span>6 porcí</span></div>
+        </div>
+        <span class="row-chevron">›</span>
+      </a>
+      <a class="row" style="border-left-color:var(--easy)">
+        <div class="row-main">
+          <div class="row-name">Bramborová polévka</div>
+          <div class="row-meta"><span>Polévka</span><span>·</span><span>40 min</span><span>·</span><span>4 porce</span></div>
+        </div>
+        <span class="row-chevron">›</span>
+      </a>
+      <a class="row" style="border-left-color:var(--easy)">
+        <div class="row-main">
+          <div class="row-name">Palačinky s tvarohem</div>
+          <div class="row-meta"><span>Sladké</span><span>·</span><span>25 min</span><span>·</span><span>4 porce</span></div>
+        </div>
+        <span class="row-chevron">›</span>
+      </a>
+      <a class="row" style="border-left-color:var(--medium)">
+        <div class="row-main">
+          <div class="row-name">Kuřecí curry</div>
+          <div class="row-meta"><span>Hlavní jídlo</span><span>·</span><span>45 min</span><span>·</span><span>3 porce</span></div>
+        </div>
+        <span class="row-chevron">›</span>
+      </a>
+      <a class="row" style="border-left-color:var(--medium)">
+        <div class="row-main">
+          <div class="row-name">Houbové rizoto</div>
+          <div class="row-meta"><span>Hlavní jídlo</span><span>·</span><span>35 min</span><span>·</span><span>4 porce</span></div>
+        </div>
+        <span class="row-chevron">›</span>
+      </a>
+      <a class="row" style="border-left-color:var(--easy)">
+        <div class="row-main">
+          <div class="row-name">Zeleninový salát</div>
+          <div class="row-meta"><span>Salát</span><span>·</span><span>15 min</span><span>·</span><span>2 porce</span></div>
+        </div>
+        <span class="row-chevron">›</span>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

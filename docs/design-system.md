@@ -1,0 +1,104 @@
+# Design system
+
+Single source of truth for styling across the app (login, list, detail) and
+the printable card. If a page's CSS disagrees with this file, the file wins —
+update the file first, then the page.
+
+**Direction:** dark, minimal "kitchen counter" shell with warm paper-colored
+surfaces for anything recipe-related (list rows, the detail panel, the login
+card). This mirrors the physical card itself — laminated paper on a dark
+counter — so the web app and the printed object read as the same product.
+Committed single theme (no light/dark toggle for now).
+
+**Unifying motif:** the difficulty stripe. The printed card carries a
+difficulty-colored band across the top (see `card-example-front.svg` /
+`card-example-back.svg`). The app echoes it as a colored left border on every
+list row and as the dot on difficulty pills — the same signal, glanceable, in
+both the physical and digital object.
+
+## Color
+
+| Token | Hex | Usage |
+|---|---|---|
+| `--bg` | `#1b1815` | App shell background |
+| `--bg-raised` | `#241f1a` | Header/nav bar, raised panels on the shell |
+| `--line` | `#33302a` | Hairlines/borders on the dark shell |
+| `--text` | `#efe9de` | Primary text on the dark shell |
+| `--text-dim` | `#a89f8f` | Secondary text on the dark shell |
+| `--surface` | `#efe9de` | Paper surface: list rows, detail panel, login card |
+| `--surface-ink` | `#221f1c` | Primary text on `--surface` |
+| `--surface-ink-dim` | `#6b6255` | Secondary text on `--surface` |
+| `--rule` | `#d8cfbe` | Dividers on `--surface` |
+| `--accent` | `#b8502a` | Brand accent: links, primary actions, focus |
+
+Difficulty (the stripe — used nowhere else, so it always means the same thing):
+
+| Token | Hex | Difficulty |
+|---|---|---|
+| `--easy` | `#6f8f5c` | Easy |
+| `--medium` | `#c98a2e` | Medium |
+| `--hard` | `#a1423a` | Hard |
+
+> Note: `shared/types/recipe.ts` currently derives card accent color from
+> **category** (`CATEGORY_COLORS`). That predates this decision and needs to
+> change to derive from **difficulty** instead, to match the printed card and
+> this doc. Category stays a plain text label / filter facet, uncolored.
+
+## Type
+
+Same three faces as the printed card, loaded once for the whole app:
+
+```html
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap">
+```
+
+| Role | Family | Weight | Size (mobile) | Usage |
+|---|---|---|---|---|
+| Display L | Fraunces | 600 | 28px | Recipe name on the detail page |
+| Display M | Fraunces | 600 | 17–19px | Recipe name in a list row, page titles |
+| Body | IBM Plex Sans | 400 | 15px | Paragraphs, form fields, buttons |
+| Label | IBM Plex Mono | 600 | 11px, uppercase, +0.08em tracking | Eyebrows, field labels, section headers |
+| Data | IBM Plex Mono | 500 | 13px, tabular-nums | Times, servings, counts, step numbers |
+| Footnote | IBM Plex Sans | 400 | 12px, `--text-dim`/`--surface-ink-dim` | Timestamps, hints |
+
+All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó ř š
+ť ú ů ý ž`) render correctly — verified in `card-example-front.svg`.
+
+## Space & shape
+
+- Spacing scale (px): `4 8 12 16 24 32 48` — use `gap`, not stacked margins.
+- Radius: `8px` controls (button/input/pill), `14px` panels (list rows, detail
+  panel, login card). The printed card keeps its own `3.2mm` — unrelated
+  scale, don't reconcile the two.
+- Max content width: `640px`, centered — this is a personal recipe box, not a
+  dashboard; a single readable column beats a wide layout on every screen
+  size, mobile included.
+
+## Components
+
+- **Button, primary** — `--accent` fill, `--text` on it, `8px` radius.
+- **Button, ghost** — transparent, `1px --line` border, used for secondary
+  actions (Cancel, Print).
+- **Input / select / textarea** — sit on `--surface` panels only (never
+  directly on `--bg`); `1px --rule` border, `--accent` focus ring.
+- **Pill** — category filter: outline, neutral. Difficulty filter: filled
+  with the difficulty token at low opacity, dot in the solid color.
+- **List row** — `--surface` panel, `14px` radius, **4px left border in the
+  recipe's difficulty color**, name (Display M) + meta line (Data: category ·
+  time · servings), chevron.
+- **Search field** — sticky under the header on the list page, `Data`-styled
+  placeholder, fuzzy match (no exact-substring requirement).
+
+## Pages
+
+1. **Login** — username + password, nothing else. No self-registration.
+2. **List** — search (fuzzy) + category/difficulty filter pills + sort
+   (name / time / difficulty / last updated) → list of rows.
+3. **Detail** — one page for view, edit, *and* create (no separate create
+   form). Print-card preview (front/back) at the top, edit fields below,
+   Save / Delete / Download / Print actions.
+
+## Reference files
+
+- `card-example-front.svg`, `card-example-back.svg` — the printed card at
+  true scale, difficulty stripe shown in "Hard".
