@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recepikarter — Detail receptu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1b1815;
+    --bg-raised: #241f1a;
+    --line: #33302a;
+    --text: #efe9de;
+    --text-dim: #a89f8f;
+    --surface: #efe9de;
+    --surface-ink: #221f1c;
+    --surface-ink-dim: #6b6255;
+    --rule: #d8cfbe;
+    --accent: #b8502a;
+    --easy: #6f8f5c;
+    --medium: #c98a2e;
+    --hard: #a1423a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  .btn {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 16px;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--accent); color: #fdf9f2; }
+  .btn-danger { background: transparent; color: var(--hard); border: 1px solid var(--hard); }
+
+  /* Preview fills the screen by default; a bottom sheet (drag up) reveals editing. */
+  .detail-screen {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .detail-preview {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 20px;
+    gap: 16px;
+  }
+
+  .floating-back {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(36, 31, 26, 0.72);
+    border: 1px solid var(--line);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    cursor: pointer;
+    z-index: 5;
+  }
+
+  .preview-tabs {
+    display: flex;
+    gap: 6px;
+    background: var(--bg-raised);
+    border-radius: 8px;
+    padding: 3px;
+    width: fit-content;
+  }
+
+  .preview-tabs button {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .preview-tabs button.active { background: var(--accent); color: #fdf9f2; }
+
+  .card-preview {
+    width: 240px;
+    height: 502px;
+    background: var(--surface);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px -18px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mini-stripe { height: 16px; background: var(--hard); flex: none; }
+  .mini-body { padding: 16px 16px 13px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .mini-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; color: var(--hard); }
+  .mini-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 19px; color: var(--surface-ink); line-height: 1.15; }
+  .mini-attrs { display: flex; gap: 14px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 9px 0; }
+  .mini-attrs div { display: flex; flex-direction: column; gap: 2px; }
+  .mini-attrs .l { font-family: 'IBM Plex Mono', monospace; font-size: 7px; color: var(--surface-ink-dim); text-transform: uppercase; }
+  .mini-attrs .v { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700; color: var(--surface-ink); }
+  .mini-section { font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
+  .mini-list { list-style: none; margin: 5px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .mini-list li { font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: var(--surface-ink); display: flex; gap: 6px; }
+  .mini-list li::before { content: ''; width: 4px; height: 4px; margin-top: 5px; border-radius: 50%; border: 1px solid var(--hard); flex: none; }
+
+  /* the drag-up sheet: collapsed by default (handle only), expands over the preview */
+  .sheet-check { position: absolute; opacity: 0; pointer-events: none; }
+
+  .sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 84px;
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -16px 32px -20px rgba(0,0,0,0.55);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: height 0.35s cubic-bezier(.4,0,.2,1);
+    z-index: 4;
+  }
+
+  .sheet-check:checked ~ .sheet { height: min(620px, 82vh); }
+
+  .sheet-handle {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px 13px;
+    cursor: pointer;
+  }
+
+  .sheet-grabber { width: 38px; height: 4px; border-radius: 2px; background: var(--rule); }
+
+  .sheet-handle-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sheet-handle-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--surface-ink);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .sheet-handle-label .chevron { display: inline-block; transition: transform 0.35s ease; }
+  .sheet-check:checked ~ .sheet .sheet-handle-label .chevron { transform: rotate(180deg); }
+
+  .sheet-quick-actions { display: flex; gap: 8px; }
+
+  .sheet-icon-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--rule);
+    background: #fff;
+    color: var(--surface-ink);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .sheet-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 2px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .form-section { display: flex; flex-direction: column; gap: 10px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+
+  .form-section .field label { color: var(--surface-ink-dim); }
+
+  .form-section .field input,
+  .form-section .field select,
+  .form-section .field textarea {
+    font: 400 14.5px 'IBM Plex Sans', sans-serif;
+    padding: 10px 11px;
+    border-radius: 8px;
+    border: 1px solid var(--rule);
+    background: #fff;
+    color: var(--surface-ink);
+  }
+
+  .section-heading {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--surface-ink-dim);
+  }
+
+  .list-edit-row { display: flex; align-items: center; gap: 6px; }
+  .list-edit-row input { flex: 1; }
+  .list-edit-row .rm { color: var(--hard); font-size: 13px; flex: none; width: 20px; background: none; border: none; cursor: pointer; }
+  .add-link { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--accent); align-self: flex-start; background: none; border: none; cursor: pointer; padding: 0; }
+
+  .sheet-footer {
+    flex: none;
+    display: flex;
+    gap: 8px;
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--rule);
+  }
+
+  .sheet-footer .btn { flex: 1; text-align: center; }
+  .sheet-footer .btn-danger { flex: none; width: 44px; }
+</style>
+</head>
+<body>
+  <div class="detail-screen">
+    <div class="detail-preview">
+      <button class="floating-back" aria-label="Zpět">‹</button>
+      <div class="preview-tabs">
+        <button class="active">Přední strana</button>
+        <button>Zadní strana</button>
+      </div>
+
+      <div class="card-preview">
+        <div class="mini-stripe"></div>
+        <div class="mini-body">
+          <div>
+            <div class="mini-eyebrow">HLAVNÍ JÍDLO</div>
+            <div class="mini-title">Svíčková na smetaně</div>
+          </div>
+          <div class="mini-attrs">
+            <div><span class="l">Čas</span><span class="v">180 min</span></div>
+            <div><span class="l">Obtížnost</span><span class="v">Těžká</span></div>
+            <div><span class="l">Porce</span><span class="v">6</span></div>
+          </div>
+          <div>
+            <div class="mini-section">SUROVINY</div>
+            <ul class="mini-list">
+              <li>1,2 kg hovězí plece</li>
+              <li>250 g kořenové zeleniny</li>
+              <li>200 ml smetany ke šlehání</li>
+              <li>100 g uzené slaniny</li>
+              <li>2 lžíce hladké mouky</li>
+              <li>nové koření, bobkový list</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <input type="checkbox" id="sheetToggle" class="sheet-check" />
+    <div class="sheet">
+      <label for="sheetToggle" class="sheet-handle">
+        <span class="sheet-grabber"></span>
+        <span class="sheet-handle-row">
+          <span class="sheet-handle-label"><span class="chevron">▴</span> Upravit recept</span>
+          <span class="sheet-quick-actions">
+            <span class="sheet-icon-btn" title="Stáhnout PNG">⬇</span>
+            <span class="sheet-icon-btn" title="Tisk">⎙</span>
+          </span>
+        </span>
+      </label>
+
+      <div class="sheet-scroll">
+        <div class="form-section">
+          <span class="section-heading">Základní údaje</span>
+          <div class="field">
+            <label for="name">Název</label>
+            <input id="name" value="Svíčková na smetaně" />
+          </div>
+          <div class="form-row">
+            <div class="field">
+              <label for="cat">Kategorie</label>
+              <select id="cat"><option>Hlavní jídlo</option></select>
+            </div>
+            <div class="field">
+              <label for="diff">Obtížnost</label>
+              <select id="diff"><option>Těžká</option></select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field">
+              <label for="time">Čas (min)</label>
+              <input id="time" value="180" />
+            </div>
+            <div class="field">
+              <label for="serv">Porce</label>
+              <input id="serv" value="6" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <span class="section-heading">Suroviny</span>
+          <div class="list-edit-row"><input value="1,2 kg hovězí plece" /><button class="rm">✕</button></div>
+          <div class="list-edit-row"><input value="250 g kořenové zeleniny" /><button class="rm">✕</button></div>
+          <div class="list-edit-row"><input value="200 ml smetany ke šlehání" /><button class="rm">✕</button></div>
+          <button class="add-link">+ Přidat surovinu</button>
+        </div>
+
+        <div class="form-section">
+          <span class="section-heading">Postup</span>
+          <div class="list-edit-row"><input value="Maso naspikujte slaninou, osolte." /><button class="rm">✕</button></div>
+          <div class="list-edit-row"><input value="Zeleninu a koření orestujte dozlatova." /><button class="rm">✕</button></div>
+          <button class="add-link">+ Přidat krok</button>
+        </div>
+      </div>
+
+      <div class="sheet-footer">
+        <button class="btn btn-danger">🗑</button>
+        <button class="btn btn-primary">Uložit</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
