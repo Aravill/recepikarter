@@ -33,23 +33,17 @@ export interface Recipe {
 
 export type RecipeInput = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>
 
-// Accent color for the printed card is derived from category, not stored,
-// so every card in a category looks consistent without a manual picker.
-export const CATEGORY_COLORS: Record<Category, string> = {
-  'Main Course': '#c1552c',
-  Soup: '#c99a2e',
-  Salad: '#5b7553',
-  Appetizer: '#7a4665',
-  'Side Dish': '#8a8f3f',
-  Breakfast: '#d17a3f',
-  Sweet: '#b3467c',
-  Bread: '#8a6d4b',
-  Sauce: '#a13f3f',
-  Beverage: '#3f6c7a',
+// Accent color (the difficulty stripe) is derived from difficulty, not
+// stored, and not category — see docs/design-system.md. Category stays a
+// plain text label used only for filtering.
+export const DIFFICULTY_COLORS: Record<Difficulty, string> = {
+  Easy: '#6f8f5c',
+  Medium: '#c98a2e',
+  Hard: '#a1423a',
 }
 
-export function categoryColor(category: Category): string {
-  return CATEGORY_COLORS[category] ?? '#3a3a3a'
+export function difficultyColor(difficulty: Difficulty): string {
+  return DIFFICULTY_COLORS[difficulty] ?? '#3a3a3a'
 }
 
 export function emptyRecipeInput(): RecipeInput {
