@@ -2,7 +2,9 @@
 const route = useRoute()
 const { loggedIn, clear } = useUserSession()
 
-const showHeader = computed(() => route.path !== '/login' && loggedIn.value)
+const showHeader = computed(
+  () => loggedIn.value && route.path !== '/login' && !route.path.startsWith('/recipes'),
+)
 
 async function onLogout() {
   await clear()
@@ -16,8 +18,8 @@ async function onLogout() {
     <header v-if="showHeader" class="app-header">
       <NuxtLink to="/" class="brand">Recepikarter</NuxtLink>
       <div class="header-actions">
-        <NuxtLink to="/recipes/new" class="new-btn">+ Nový recept</NuxtLink>
         <button class="logout-btn" @click="onLogout">Odhlásit</button>
+        <NuxtLink to="/recipes/new" class="fab" aria-label="Nový recept">+</NuxtLink>
       </div>
     </header>
     <main class="app-main">
@@ -92,14 +94,18 @@ a {
   gap: 12px;
 }
 
-.new-btn {
-  text-decoration: none;
+.fab {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: var(--accent);
   color: #fdf9f2;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
+  text-decoration: none;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .logout-btn {
@@ -120,9 +126,9 @@ a {
 
 .app-main {
   flex: 1;
-  max-width: 1200px;
+  max-width: 640px;
   width: 100%;
   margin: 0 auto;
-  padding: 24px;
+  padding: 18px;
 }
 </style>
