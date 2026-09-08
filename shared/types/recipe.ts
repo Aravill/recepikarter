@@ -17,6 +17,28 @@ export const DIFFICULTIES = ['Easy', 'Medium', 'Hard'] as const
 
 export type Difficulty = (typeof DIFFICULTIES)[number]
 
+// Stored values stay stable English enum keys; these are the Czech labels
+// shown in the UI (the app's content and copy are Czech — see
+// docs/design-system.md). Keeps the data model decoupled from a locale.
+export const CATEGORY_LABELS: Record<Category, string> = {
+  'Main Course': 'Hlavní jídlo',
+  Soup: 'Polévka',
+  Salad: 'Salát',
+  Appetizer: 'Předkrm',
+  'Side Dish': 'Příloha',
+  Breakfast: 'Snídaně',
+  Sweet: 'Sladké',
+  Bread: 'Pečivo',
+  Sauce: 'Omáčka',
+  Beverage: 'Nápoj',
+}
+
+export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  Easy: 'Snadné',
+  Medium: 'Střední',
+  Hard: 'Těžké',
+}
+
 export interface Recipe {
   id: number
   name: string

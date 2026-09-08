@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Fuse from 'fuse.js'
-import { CATEGORIES, DIFFICULTIES } from '#shared/types/recipe'
+import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { Category, Difficulty, Recipe } from '#shared/types/recipe'
 
 const { listRecipes } = useRecipes()
@@ -75,8 +75,6 @@ function toggleDifficulty(difficulty: Difficulty) {
   selectedDifficulty.value = selectedDifficulty.value === difficulty ? null : difficulty
 }
 
-const DIFFICULTY_LABEL: Record<Difficulty, string> = { Easy: 'Snadné', Medium: 'Střední', Hard: 'Těžké' }
-
 function recipeCountLabel(n: number) {
   if (n === 1) return `${n} recept`
   if (n >= 2 && n <= 4) return `${n} recepty`
@@ -99,7 +97,7 @@ function recipeCountLabel(n: number) {
         :class="{ active: selectedCategory === category }"
         @click="toggleCategory(category)"
       >
-        {{ category }}
+        {{ CATEGORY_LABELS[category] }}
       </button>
       <button
         v-for="difficulty in DIFFICULTIES"
@@ -109,7 +107,7 @@ function recipeCountLabel(n: number) {
         @click="toggleDifficulty(difficulty)"
       >
         <span class="dot" :style="{ background: `var(--${difficulty.toLowerCase()})` }" />
-        {{ DIFFICULTY_LABEL[difficulty] }}
+        {{ DIFFICULTY_LABELS[difficulty] }}
       </button>
     </div>
 
@@ -142,7 +140,7 @@ function recipeCountLabel(n: number) {
         <div class="row-main">
           <div class="row-name">{{ recipe.name }}</div>
           <div class="row-meta">
-            <span>{{ recipe.category }}</span>
+            <span>{{ CATEGORY_LABELS[recipe.category] }}</span>
             <span>·</span>
             <span>{{ recipe.cookTime }} min</span>
             <span v-if="recipe.servings">·</span>
