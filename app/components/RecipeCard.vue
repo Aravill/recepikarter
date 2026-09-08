@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { categoryColor } from '../../shared/types/recipe'
-import type { Recipe, RecipeInput } from '../../shared/types/recipe'
+import { categoryColor } from '#shared/types/recipe'
+import type { Recipe, RecipeInput } from '#shared/types/recipe'
 
 const props = defineProps<{
   recipe: Recipe | RecipeInput

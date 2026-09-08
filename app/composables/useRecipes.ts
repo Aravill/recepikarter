@@ -1,4 +1,4 @@
-import type { Recipe, RecipeInput } from '../../shared/types/recipe'
+import type { Recipe, RecipeInput } from '#shared/types/recipe'
 
 export function useRecipes() {
   const listRecipes = () => $fetch<Recipe[]>('/api/recipes')

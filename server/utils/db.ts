@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import Database from 'better-sqlite3'
-import type { Recipe, RecipeInput } from '../../shared/types/recipe'
+import type { Recipe, RecipeInput } from '#shared/types/recipe'
 
 const dbPath = process.env.RECIPE_DB_PATH || join(process.cwd(), 'data', 'recipes.sqlite')
 

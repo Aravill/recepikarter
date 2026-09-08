@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { CATEGORIES, DIFFICULTIES } from '../../shared/types/recipe'
-import type { RecipeInput } from '../../shared/types/recipe'
+import { CATEGORIES, DIFFICULTIES } from '#shared/types/recipe'
+import type { RecipeInput } from '#shared/types/recipe'
 
 const model = defineModel<RecipeInput>({ required: true })
 

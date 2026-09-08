@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CATEGORIES } from '../../shared/types/recipe'
+import { CATEGORIES } from '#shared/types/recipe'
 
 const { listRecipes, deleteRecipe } = useRecipes()
 
