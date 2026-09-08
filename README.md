@@ -1,75 +1,58 @@
-# Nuxt Minimal Starter
+# Recepikarter
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+A small, self-hosted recipe box. Recepikarter manages a family's recipes as
+structured records — name, category, cook time, difficulty, servings,
+ingredients, steps, tags — and turns each one into a laminated, pocket-sized
+recipe card you can actually keep in a drawer: front side for the
+ingredients and the vitals, back side for the method, sized to slip into a
+pocket (Xiaomi 17 footprint, 71.8 × 150.5 mm) and cut after laminating.
 
-## Setup
+The point isn't just data entry. Editing a recipe shows the same
+pre-rendered card design you'll end up holding, difficulty coded by a color
+stripe, so what you see while typing is what comes out of the printer —
+never a raw form pretending to be the product.
 
-Make sure to install dependencies:
+## What it does
+
+- **Create, edit, delete, browse** recipes through a small Vue/Nuxt web app,
+  fuzzy-searchable and filterable by category or difficulty.
+- **Stores** each recipe as a plain row in a local SQLite database — no
+  external service, easy to back up, easy to inspect.
+- **Renders** every recipe as a two-sided printable card and lets you
+  download it (or print it directly) for lamination.
+- **Runs** on a home server for a single household — a login page, not a
+  multi-tenant accounts system.
+
+## Stack
+
+- [Nuxt 4](https://nuxt.com) (Vue 3 + Nitro) — one framework for the API and
+  the UI, self-hosted.
+- `better-sqlite3` for storage (`data/recipes.sqlite`, gitignored).
+- `html-to-image` to export the rendered card as a printable PNG.
+
+## Design
+
+The visual language — palette, type, spacing, components — is documented in
+[`docs/design-system.md`](docs/design-system.md), with the approved
+reference designs alongside it:
+
+- `docs/card-example-front.svg`, `docs/card-example-back.svg` — the printed
+  card at true scale.
+- `docs/screen-login.html`, `docs/screen-list.html`,
+  `docs/screen-detail.html` — the three app screens, real markup, openable
+  directly in a browser.
+
+## Development
 
 ```bash
-# npm
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
-
-Build the application for production:
+The app runs at `http://localhost:3000`. The SQLite database is created on
+first run at `data/recipes.sqlite` (override with `RECIPE_DB_PATH`).
 
 ```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+npm run build     # production build
+npm run preview   # preview the production build locally
 ```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
