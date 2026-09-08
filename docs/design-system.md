@@ -88,17 +88,27 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   time · servings), chevron.
 - **Search field** — sticky under the header on the list page, `Data`-styled
   placeholder, fuzzy match (no exact-substring requirement).
+- **Bottom sheet** — the detail page's edit form. `--surface` panel anchored
+  to the bottom, `20px` top-corner radius, collapsed to a `handle` (grabber +
+  "Upravit recept" label + quick download/print icons) by default; drag (or
+  tap the handle) to expand it over the preview. Save/Delete pinned at its
+  bottom, outside the scrollable form area.
 
 ## Pages
 
 1. **Login** — username + password, nothing else. No self-registration.
 2. **List** — search (fuzzy) + category/difficulty filter pills + sort
    (name / time / difficulty / last updated) → list of rows.
-3. **Detail** — one page for view, edit, *and* create (no separate create
-   form). Print-card preview (front/back) at the top, edit fields below,
-   Save / Delete / Download / Print actions.
+3. **Detail** — one page for view, edit, *and* create. Opens straight onto
+   the full pre-rendered card preview (front/back tabs) — reading a recipe
+   never starts with text boxes. Editing lives in the bottom sheet, collapsed
+   by default. Creating a new recipe opens the same layout with the sheet
+   already expanded (nothing to preview yet), empty fields, no Delete button.
 
 ## Reference files
 
 - `card-example-front.svg`, `card-example-back.svg` — the printed card at
   true scale, difficulty stripe shown in "Hard".
+- `screen-login.html`, `screen-list.html`, `screen-detail.html` — standalone,
+  real-markup references for the three app screens. Open directly in a
+  browser (mobile viewport recommended).
