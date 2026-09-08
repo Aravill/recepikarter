@@ -1,9 +1,24 @@
+<script setup lang="ts">
+const route = useRoute()
+const { loggedIn, clear } = useUserSession()
+
+const showHeader = computed(() => route.path !== '/login' && loggedIn.value)
+
+async function onLogout() {
+  await clear()
+  await navigateTo('/login')
+}
+</script>
+
 <template>
   <div class="app-shell">
     <NuxtRouteAnnouncer />
-    <header class="app-header">
-      <NuxtLink to="/" class="brand">🍳 Recepikarter</NuxtLink>
-      <NuxtLink to="/recipes/new" class="new-btn">+ New recipe</NuxtLink>
+    <header v-if="showHeader" class="app-header">
+      <NuxtLink to="/" class="brand">Recepikarter</NuxtLink>
+      <div class="header-actions">
+        <NuxtLink to="/recipes/new" class="new-btn">+ Nový recept</NuxtLink>
+        <button class="logout-btn" @click="onLogout">Odhlásit</button>
+      </div>
     </header>
     <main class="app-main">
       <NuxtPage />
@@ -13,7 +28,21 @@
 
 <style>
 :root {
-  color-scheme: light;
+  --bg: #1b1815;
+  --bg-raised: #241f1a;
+  --line: #33302a;
+  --text: #efe9de;
+  --text-dim: #a89f8f;
+  --surface: #efe9de;
+  --surface-ink: #221f1c;
+  --surface-ink-dim: #6b6255;
+  --rule: #d8cfbe;
+  --accent: #b8502a;
+  --easy: #6f8f5c;
+  --medium: #c98a2e;
+  --hard: #a1423a;
+
+  color-scheme: dark;
 }
 
 * {
@@ -22,13 +51,19 @@
 
 body {
   margin: 0;
-  background: #f4efe4;
-  color: #2c2825;
-  font-family: ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
 }
 
 a {
   color: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-header {
@@ -39,33 +74,54 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
-  background: #2c2825;
-  color: #fdf9f2;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--line);
 }
 
 .brand {
-  font-size: 18px;
-  font-weight: 700;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 19px;
+  font-weight: 600;
   text-decoration: none;
-  color: inherit;
+  color: var(--text);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .new-btn {
   text-decoration: none;
-  background: #c1552c;
-  color: #fff;
+  background: var(--accent);
+  color: #fdf9f2;
   padding: 8px 14px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
 }
 
-.new-btn:hover {
-  background: #a8471f;
+.logout-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
 }
 
 .app-main {
+  flex: 1;
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
   padding: 24px;
 }

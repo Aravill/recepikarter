@@ -7,12 +7,14 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "hash-password": "node scripts/hash-password.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "html-to-image": "^1.11.13",
     "nuxt": "^4.5.2",
+    "nuxt-auth-utils": "^0.5.30",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"
   },
