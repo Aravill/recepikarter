@@ -56,3 +56,21 @@ first run at `data/recipes.sqlite` (override with `RECIPE_DB_PATH`).
 npm run build     # production build
 npm run preview   # preview the production build locally
 ```
+
+## Deployment (Docker)
+
+```bash
+cp .env.example .env
+npm run hash-password -- "your-password"   # paste the output into .env
+docker compose up -d --build
+```
+
+The app is then at `http://localhost:3000` (override the host port with
+`PORT` in `.env`). The SQLite database lives in a named volume
+(`db-data:/app/data`) so it survives rebuilds and restarts.
+
+`AUTH_PASSWORD_HASH` is deliberately base64-encoded in `.env` — the raw
+scrypt hash is in PHC format (`$scrypt$n=...,r=...,p=...$salt$hash`), and
+both Docker Compose's `.env` parser and a plain shell `source .env` treat
+bare `$` as a variable reference, silently corrupting it. Always generate
+the value with `npm run hash-password`, never paste a raw hash in by hand.

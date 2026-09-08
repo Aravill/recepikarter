@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    container_name: recepikarter
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    volumes:
+      - db-data:/app/data
+
+volumes:
+  db-data:
