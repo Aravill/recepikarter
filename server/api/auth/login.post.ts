@@ -4,7 +4,11 @@ export default defineEventHandler(async (event) => {
   const password = typeof body?.password === 'string' ? body.password : ''
 
   const expectedUsername = process.env.AUTH_USERNAME
+  // AUTH_PASSWORD_HASH is stored base64-encoded (see scripts/hash-password.mjs)
+  // so the raw PHC-format hash's `$` characters never hit a .env parser.
   const expectedHash = process.env.AUTH_PASSWORD_HASH
+    ? Buffer.from(process.env.AUTH_PASSWORD_HASH, 'base64').toString('utf8')
+    : undefined
 
   if (!expectedUsername || !expectedHash) {
     throw createError({ statusCode: 500, statusMessage: 'Auth not configured: set AUTH_USERNAME / AUTH_PASSWORD_HASH' })
