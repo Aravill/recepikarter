@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="76.8mm" height="155.5mm" viewBox="0 0 76.8 155.5">
+  <title>Recepikarter — pocket card example (front), Svíčková na smetaně</title>
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600;700&amp;display=swap');
+      /* font-size is unitless: the viewBox is already in mm, so 1 user unit = 1mm */
+      .eyebrow   { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 600; font-size: 2px; letter-spacing: .06px; fill: #a1423a; }
+      .title     { font-family: 'Fraunces', Georgia, 'Times New Roman', serif; font-weight: 600; font-size: 4.6px; fill: #221f1c; }
+      .attr-lbl  { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 500; font-size: 1.75px; letter-spacing: .04px; fill: #6b6255; }
+      .attr-val  { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 700; font-size: 2.78px; fill: #221f1c; }
+      .section   { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 600; font-size: 2px; letter-spacing: .06px; fill: #b8502a; }
+      .item      { font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; font-weight: 400; font-size: 2.7px; fill: #221f1c; }
+    </style>
+  </defs>
+
+  <!-- full-bleed card background -->
+  <rect x="0" y="0" width="76.8" height="155.5" rx="3.2" fill="#efe9de"/>
+
+  <!-- difficulty stripe (Těžká / Hard) -->
+  <path d="M0,3.2 A3.2,3.2 0 0 1 3.2,0 L73.6,0 A3.2,3.2 0 0 1 76.8,3.2 L76.8,4.5 L0,4.5 Z" fill="#a1423a"/>
+
+  <!-- trim line: cut here after laminating -->
+  <rect x="2.5" y="2.5" width="71.8" height="150.5" rx="2" fill="none" stroke="#221f1c" stroke-opacity=".28" stroke-width=".35" stroke-dasharray="1.4 1.2"/>
+
+  <!-- identity -->
+  <text x="8" y="13.5" class="eyebrow">HLAVNÍ JÍDLO</text>
+  <text x="8" y="20.6" class="title">Svíčková na smetaně</text>
+
+  <!-- attribute rule + row -->
+  <line x1="8" y1="25.5" x2="68.8" y2="25.5" stroke="#d8cfbe" stroke-width=".3"/>
+  <text x="8"  y="31" class="attr-lbl">ČAS</text>
+  <text x="30" y="31" class="attr-lbl">OBTÍŽNOST</text>
+  <text x="58" y="31" class="attr-lbl">PORCE</text>
+  <text x="8"  y="36.5" class="attr-val">180 min</text>
+  <text x="30" y="36.5" class="attr-val">Těžká</text>
+  <text x="58" y="36.5" class="attr-val">6</text>
+  <line x1="8" y1="40.5" x2="68.8" y2="40.5" stroke="#d8cfbe" stroke-width=".3"/>
+
+  <!-- ingredients -->
+  <text x="8" y="47.5" class="section">SUROVINY</text>
+
+  <g>
+    <circle cx="9" cy="52.2" r=".8" fill="none" stroke="#a1423a" stroke-width=".35"/>
+    <text x="12" y="53.4" class="item">1,2 kg hovězí plece</text>
+  </g>
+  <g>
+    <circle cx="9" cy="57.2" r=".8" fill="none" stroke="#a1423a" stroke-width=".35"/>
+    <text x="12" y="58.4" class="item">250 g kořenové zeleniny</text>
+  </g>
+  <g>
+    <circle cx="9" cy="62.2" r=".8" fill="none" stroke="#a1423a" stroke-width=".35"/>
+    <text x="12" y="63.4" class="item">200 ml smetany ke šlehání</text>
+  </g>
+  <g>
+    <circle cx="9" cy="67.2" r=".8" fill="none" stroke="#a1423a" stroke-width=".35"/>
+    <text x="12" y="68.4" class="item">100 g uzené slaniny</text>
+  </g>
+  <g>
+    <circle cx="9" cy="72.2" r=".8" fill="none" stroke="#a1423a" stroke-width=".35"/>
+    <text x="12" y="73.4" class="item">2 lžíce hladké mouky</text>
+  </g>
+  <g>
+    <circle cx="9" cy="77.2" r=".8" fill="none" stroke="#a1423a" stroke-width=".35"/>
+    <text x="12" y="78.4" class="item">nové koření, bobkový list</text>
+  </g>
+  <g>
+    <circle cx="9" cy="82.2" r=".8" fill="none" stroke="#a1423a" stroke-width=".35"/>
+    <text x="12" y="83.4" class="item">ocet, cukr, sůl</text>
+  </g>
+  <g>
+    <circle cx="9" cy="87.2" r=".8" fill="none" stroke="#a1423a" stroke-width=".35"/>
+    <text x="12" y="88.4" class="item">bramborový knedlík</text>
+  </g>
+</svg>
