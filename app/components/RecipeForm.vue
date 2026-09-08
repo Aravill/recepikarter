@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CATEGORIES, DIFFICULTIES } from '#shared/types/recipe'
+import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { RecipeInput } from '#shared/types/recipe'
 
 const model = defineModel<RecipeInput>({ required: true })
@@ -29,165 +29,148 @@ function removeStep(i: number) {
 </script>
 
 <template>
-  <form class="recipe-form" @submit.prevent>
-    <label class="field">
-      <span>Name</span>
-      <input v-model="model.name" type="text" placeholder="Grandma's lasagna" required />
-    </label>
-
-    <div class="field-row">
-      <label class="field">
-        <span>Category</span>
-        <select v-model="model.category">
-          <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span>Difficulty</span>
-        <select v-model="model.cookTimeDifficulty">
-          <option v-for="d in DIFFICULTIES" :key="d" :value="d">{{ d }}</option>
-        </select>
-      </label>
+  <div class="form-section">
+    <span class="section-heading">Základní údaje</span>
+    <div class="field">
+      <label for="f-name">Název</label>
+      <input id="f-name" v-model="model.name" type="text" placeholder="Svíčková na smetaně" required />
     </div>
-
-    <div class="field-row">
-      <label class="field">
-        <span>Cook time (minutes)</span>
-        <input v-model.number="model.cookTime" type="number" min="0" required />
-      </label>
-
-      <label class="field">
-        <span>Servings</span>
-        <input v-model="model.servings" type="text" placeholder="4" />
-      </label>
+    <div class="form-row">
+      <div class="field">
+        <label for="f-category">Kategorie</label>
+        <select id="f-category" v-model="model.category">
+          <option v-for="c in CATEGORIES" :key="c" :value="c">{{ CATEGORY_LABELS[c] }}</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-difficulty">Obtížnost</label>
+        <select id="f-difficulty" v-model="model.cookTimeDifficulty">
+          <option v-for="d in DIFFICULTIES" :key="d" :value="d">{{ DIFFICULTY_LABELS[d] }}</option>
+        </select>
+      </div>
     </div>
-
-    <fieldset class="field">
-      <legend>Ingredients</legend>
-      <div class="list-row" v-for="(_, i) in model.ingredients" :key="i">
-        <input v-model="model.ingredients[i]" type="text" placeholder="2 cups flour" />
-        <button type="button" class="icon-btn" @click="removeIngredient(i)" aria-label="Remove ingredient">✕</button>
+    <div class="form-row">
+      <div class="field">
+        <label for="f-time">Čas (min)</label>
+        <input id="f-time" v-model.number="model.cookTime" type="number" min="0" required />
       </div>
-      <button type="button" class="add-btn" @click="addIngredient">+ Add ingredient</button>
-    </fieldset>
-
-    <fieldset class="field">
-      <legend>Steps</legend>
-      <div class="list-row" v-for="(_, i) in model.steps" :key="i">
-        <span class="step-index">{{ i + 1 }}</span>
-        <textarea v-model="model.steps[i]" rows="2" placeholder="Preheat oven to 200°C..." />
-        <button type="button" class="icon-btn" @click="removeStep(i)" aria-label="Remove step">✕</button>
+      <div class="field">
+        <label for="f-servings">Porce</label>
+        <input id="f-servings" v-model="model.servings" type="text" placeholder="4" />
       </div>
-      <button type="button" class="add-btn" @click="addStep">+ Add step</button>
-    </fieldset>
+    </div>
+  </div>
 
-    <label class="field">
-      <span>Tags (comma separated)</span>
-      <input v-model="tagsText" type="text" placeholder="vegetarian, quick, italian" />
-    </label>
-  </form>
+  <div class="form-section">
+    <span class="section-heading">Suroviny</span>
+    <div v-for="(_, i) in model.ingredients" :key="i" class="list-edit-row">
+      <input v-model="model.ingredients[i]" type="text" placeholder="2 lžíce hladké mouky" />
+      <button type="button" class="rm" aria-label="Odebrat surovinu" @click="removeIngredient(i)">✕</button>
+    </div>
+    <button type="button" class="add-link" @click="addIngredient">+ Přidat surovinu</button>
+  </div>
+
+  <div class="form-section">
+    <span class="section-heading">Postup</span>
+    <div v-for="(_, i) in model.steps" :key="i" class="list-edit-row">
+      <input v-model="model.steps[i]" type="text" placeholder="Troubu předehřejte na 200 °C…" />
+      <button type="button" class="rm" aria-label="Odebrat krok" @click="removeStep(i)">✕</button>
+    </div>
+    <button type="button" class="add-link" @click="addStep">+ Přidat krok</button>
+  </div>
+
+  <div class="form-section">
+    <span class="section-heading">Tagy</span>
+    <div class="field">
+      <label for="f-tags">Oddělené čárkou</label>
+      <input id="f-tags" v-model="tagsText" type="text" placeholder="svátek, rychlovka, vegetariánské" />
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.recipe-form {
+.form-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  font-family: ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  gap: 10px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.field > span,
-fieldset.field > legend {
-  font-size: 12px;
-  font-weight: 600;
-  color: #555;
-}
-
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-input,
-select,
-textarea {
-  font: inherit;
-  font-size: 14px;
-  padding: 8px 10px;
-  border: 1px solid #d6d0c4;
-  border-radius: 6px;
-  background: #fff;
-  color: #222;
-  resize: vertical;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  outline: 2px solid #c1552c;
-  outline-offset: -1px;
-}
-
-fieldset {
-  border: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
   gap: 6px;
 }
 
-.list-row {
+.field label {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--surface-ink-dim);
+}
+
+.field input,
+.field select,
+.list-edit-row input {
+  font: 400 14.5px 'IBM Plex Sans', sans-serif;
+  padding: 10px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+  background: #fff;
+  color: var(--surface-ink);
+}
+
+.field input:focus,
+.field select:focus,
+.list-edit-row input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.section-heading {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--surface-ink-dim);
+}
+
+.list-edit-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.step-index {
-  flex: none;
-  width: 18px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #8a8072;
-  text-align: right;
-}
-
-.list-row input,
-.list-row textarea {
+.list-edit-row input {
   flex: 1;
 }
 
-.icon-btn {
+.rm {
+  color: var(--hard);
+  font-size: 13px;
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  background: none;
   border: none;
-  background: transparent;
-  color: #a13f3f;
   cursor: pointer;
-  font-size: 13px;
 }
 
-.add-btn {
+.add-link {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11.5px;
+  color: var(--accent);
   align-self: flex-start;
-  border: 1px dashed #c1552c;
-  background: transparent;
-  color: #c1552c;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 13px;
+  background: none;
+  border: none;
   cursor: pointer;
-}
-
-.add-btn:hover {
-  background: #fdf1ea;
+  padding: 0;
 }
 </style>
