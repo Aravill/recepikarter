@@ -6,12 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Nuxt 4 (Vue 3 + Nitro), TypeScript throughout. `better-sqlite3` for storage — no ORM, no migration system; schema lives inline in `server/utils/db.ts` as `CREATE TABLE IF NOT EXISTS`. Auth is `nuxt-auth-utils` session cookies for a single hardcoded household account (no multi-tenant accounts, no OAuth).
 
-No lint, format, or test tooling is configured yet (no `.eslintrc`/biome/prettier config, no test framework, no corresponding npm scripts). Don't assume any of these exist — check before referencing a command.
+Linting (ESLint via `@nuxt/eslint`) and unit testing (Vitest) are configured; there is no formatter/format script. Don't assume beyond that — check before referencing a command.
 
 ## Commands
 
 - `npm run dev` — dev server at `http://localhost:3000`, DB auto-created at `data/recipes.sqlite`
 - `npm run build` / `npm run preview` — production build / preview it locally
+- `npm run lint` — ESLint over the whole project
+- `npm run test` — Vitest, runs everything under `test/`
 - `npm run hash-password -- "your-password"` — generates `AUTH_PASSWORD_HASH`; **always use this script**, never hand-paste a raw hash (see gotcha below)
 
 ## Gotchas
@@ -21,6 +23,7 @@ No lint, format, or test tooling is configured yet (no `.eslintrc`/biome/prettie
 - **Category/difficulty storage values are English; UI labels are Czech.** `shared/types/recipe.ts` deliberately decouples the two (`CATEGORIES`/`DIFFICULTIES` enums vs. `CATEGORY_LABELS`/`DIFFICULTY_LABELS` maps) — don't collapse them.
 - **Card accent color is derived from difficulty, not category**, but `docs/design-system.md` still flags this as an unresolved naming/logic inconsistency (`CATEGORY_COLORS` vs. difficulty-derived color). Treat it as a known open TODO, not settled behavior, if touching card color logic.
 - `scripts/hash-password.mjs` imports `@adonisjs/hash` directly even though it's not a declared dependency in `package.json` (it resolves transitively via `nuxt-auth-utils`). Fragile — if it breaks after a `nuxt-auth-utils` bump, that's why.
+- **Vitest runs outside Nuxt's build context**, so Nitro's auto-imports aren't available for free. `test/setup.ts` stubs the one server util under test needs (`createError`, from `h3`) onto `globalThis`, and sets `RECIPE_DB_PATH=':memory:'` before `server/utils/db.ts` is imported. `vitest.config.ts` also has to alias `#shared` to `./shared` by hand. Adding tests for a util that relies on another auto-import needs the same treatment in `test/setup.ts`.
 
 ## Conventions
 
