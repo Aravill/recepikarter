@@ -8,7 +8,8 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "hash-password": "node scripts/hash-password.mjs"
+    "hash-password": "node scripts/hash-password.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
@@ -20,6 +21,8 @@
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^9.6.0"
+    "@nuxt/eslint": "^1.17.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "eslint": "^10.10.0"
   }
 }
