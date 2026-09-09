@@ -47,8 +47,9 @@ async function onSave() {
       form.value = rest
       sheetExpanded.value = false
     }
-  } catch (e: any) {
-    errorMsg.value = e?.data?.statusMessage || 'Uložení se nezdařilo.'
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    errorMsg.value = err?.data?.statusMessage || 'Uložení se nezdařilo.'
   } finally {
     saving.value = false
   }
