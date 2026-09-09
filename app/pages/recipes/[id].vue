@@ -153,8 +153,8 @@ async function onDelete() {
   height: 34px;
   border-radius: 50%;
   background: rgba(36, 31, 26, 0.72);
-  border: 1px solid var(--line);
-  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fdf9f2;
   display: flex;
   align-items: center;
   justify-content: center;
