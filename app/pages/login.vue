@@ -16,8 +16,9 @@ async function onSubmit() {
     })
     await refreshSession()
     await navigateTo('/')
-  } catch (e: any) {
-    error.value = e?.data?.statusMessage || 'Přihlášení se nezdařilo.'
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    error.value = err?.data?.statusMessage || 'Přihlášení se nezdařilo.'
   } finally {
     submitting.value = false
   }

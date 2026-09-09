@@ -1,5 +1,5 @@
 import { CATEGORIES, DIFFICULTIES } from '#shared/types/recipe'
-import type { RecipeInput } from '#shared/types/recipe'
+import type { Category, Difficulty, RecipeInput } from '#shared/types/recipe'
 
 export function parseRecipeInput(body: unknown): RecipeInput {
   const b = body as Record<string, unknown>
@@ -7,10 +7,10 @@ export function parseRecipeInput(body: unknown): RecipeInput {
   if (typeof b?.name !== 'string' || !b.name.trim()) {
     throw createError({ statusCode: 400, statusMessage: 'name is required' })
   }
-  if (!CATEGORIES.includes(b.category as any)) {
+  if (typeof b.category !== 'string' || !CATEGORIES.includes(b.category as Category)) {
     throw createError({ statusCode: 400, statusMessage: 'invalid category' })
   }
-  if (!DIFFICULTIES.includes(b.cookTimeDifficulty as any)) {
+  if (typeof b.cookTimeDifficulty !== 'string' || !DIFFICULTIES.includes(b.cookTimeDifficulty as Difficulty)) {
     throw createError({ statusCode: 400, statusMessage: 'invalid cookTimeDifficulty' })
   }
   const cookTime = Number(b.cookTime)
