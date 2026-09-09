@@ -326,4 +326,50 @@ async function onDelete() {
   color: var(--hard);
   border: 1px solid var(--hard);
 }
+
+/* Desktop: edit panel and preview sit side by side instead of the mobile
+   drag-up sheet over a full-screen preview. Same markup either way — this
+   swaps the two panels from an absolute-positioned stack into a two-column
+   grid, which makes the sheet's expand/collapse state irrelevant (it's
+   always fully shown), so no script changes are needed. */
+@media (min-width: 900px) {
+  .detail-screen {
+    position: static;
+    min-height: auto;
+    overflow: visible;
+    margin: 0 auto;
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    align-items: start;
+    gap: 32px;
+    padding: 32px 0 56px;
+  }
+
+  .detail-preview {
+    grid-column: 2;
+    position: sticky;
+    inset: auto;
+    top: 32px;
+    padding-top: 0;
+  }
+
+  .sheet {
+    grid-column: 1;
+    position: static;
+    height: auto;
+    border-radius: 14px;
+    border: 1px solid var(--rule);
+    box-shadow: none;
+  }
+
+  .sheet-handle {
+    cursor: default;
+  }
+
+  .sheet-grabber,
+  .sheet-handle-label .chevron {
+    display: none;
+  }
+}
 </style>

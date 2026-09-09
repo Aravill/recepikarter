@@ -72,7 +72,8 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   scale, don't reconcile the two.
 - Max content width: `640px`, centered — this is a personal recipe box, not a
   dashboard; a single readable column beats a wide layout on every screen
-  size, mobile included.
+  size, mobile included. **Exception:** the detail page at desktop widths
+  (see below) — screen efficiency wins there over the single-column rule.
 
 ## Components
 
@@ -99,11 +100,17 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 1. **Login** — username + password, nothing else. No self-registration.
 2. **List** — search (fuzzy) + category/difficulty filter pills + sort
    (name / time / difficulty / last updated) → list of rows.
-3. **Detail** — one page for view, edit, *and* create. Opens straight onto
-   the full pre-rendered card preview (front/back tabs) — reading a recipe
-   never starts with text boxes. Editing lives in the bottom sheet, collapsed
-   by default. Creating a new recipe opens the same layout with the sheet
-   already expanded (nothing to preview yet), empty fields, no Delete button.
+3. **Detail** — one page for view, edit, *and* create. On mobile, opens
+   straight onto the full pre-rendered card preview (front/back tabs) —
+   reading a recipe never starts with text boxes. Editing lives in the
+   bottom sheet, collapsed by default. Creating a new recipe opens the same
+   layout with the sheet already expanded (nothing to preview yet), empty
+   fields, no Delete button. **At desktop widths (≥900px)** the same markup
+   switches to a two-column layout instead — edit panel on the left, the
+   card preview sticky on the right — since there's room for both at once
+   and the drag-to-expand sheet interaction doesn't make sense with a mouse.
+   The sheet is always fully shown (its collapse/expand state becomes a
+   no-op); nothing else about the page changes.
 
 ## Reference files
 
