@@ -1,4 +1,6 @@
-function slugify(name: string): string {
+import type { RecipeInput } from '#shared/types/recipe'
+
+export function slugify(name: string): string {
   const slug = name
     .toLowerCase()
     .normalize('NFD')
@@ -45,4 +47,30 @@ export async function exportCardPng(frontEl: HTMLElement, backEl: HTMLElement, r
   link.href = combined.toDataURL('image/png')
   link.download = `${slugify(recipeName)}.png`
   link.click()
+}
+
+// Downloads a recipe's raw data as JSON, wrapped in a single-item array so
+// the format already matches a future multi-recipe export/import — see
+// POST /api/recipes/import, which accepts exactly this shape back.
+// Re-declares the field list explicitly rather than spreading `recipe` so a
+// full `Recipe` (id/createdAt/updatedAt/lastExportedAt) can be passed
+// straight in without leaking those DB-only fields into the file.
+export function exportRecipeJson(recipe: RecipeInput): void {
+  const data: RecipeInput = {
+    name: recipe.name,
+    category: recipe.category,
+    cookTime: recipe.cookTime,
+    cookTimeDifficulty: recipe.cookTimeDifficulty,
+    servings: recipe.servings,
+    ingredients: recipe.ingredients,
+    steps: recipe.steps,
+    tags: recipe.tags,
+  }
+  const blob = new Blob([JSON.stringify([data], null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${slugify(recipe.name)}.json`
+  link.click()
+  URL.revokeObjectURL(url)
 }

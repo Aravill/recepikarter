@@ -67,6 +67,10 @@ async function onExportPng() {
   }
 }
 
+function onExportJson() {
+  if (current.value) exportRecipeJson(current.value)
+}
+
 function onEdit() {
   if (current.value) navigateTo(`/recipes/${current.value.id}`)
 }
@@ -201,6 +205,7 @@ function onKeydown(e: KeyboardEvent) {
           >
             ⬇
           </button>
+          <button class="card-action-btn" aria-label="Stáhnout JSON" @click.stop="onExportJson">📄</button>
         </div>
       </div>
     </div>

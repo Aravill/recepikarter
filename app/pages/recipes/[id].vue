@@ -51,6 +51,10 @@ async function onExportPng() {
   }
 }
 
+function onExportJson() {
+  exportRecipeJson(form.value)
+}
+
 function onPrint() {
   window.print()
 }
@@ -127,6 +131,7 @@ async function onDelete() {
           </span>
           <span class="sheet-quick-actions">
             <button class="sheet-icon-btn" title="Stáhnout PNG" :disabled="exporting" @click.stop="onExportPng">⬇</button>
+            <button class="sheet-icon-btn" title="Stáhnout JSON" @click.stop="onExportJson">📄</button>
             <button class="sheet-icon-btn" title="Tisk" @click.stop="onPrint">⎙</button>
           </span>
         </span>
