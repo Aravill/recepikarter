@@ -243,6 +243,8 @@ function selectDifficulty(difficulty: Difficulty | null) {
         <span class="row-chevron">›</span>
       </NuxtLink>
     </div>
+
+    <NuxtLink v-if="!pending" to="/recipes/new" class="new-recipe-btn">+ Nový recept</NuxtLink>
   </div>
 </template>
 
@@ -497,5 +499,20 @@ function selectDifficulty(difficulty: Difficulty | null) {
   color: var(--surface-ink-dim);
   font-size: 17px;
   flex: none;
+}
+
+.new-recipe-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+  padding: 13px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fdf9f2;
+  text-decoration: none;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
 }
 </style>
