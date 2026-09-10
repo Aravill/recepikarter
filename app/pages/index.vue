@@ -14,10 +14,16 @@ const sortBy = ref<'updated' | 'name' | 'time' | 'difficulty'>('updated')
 const viewMode = ref<'cards' | 'list'>('cards')
 const categoryMenuOpen = ref(false)
 const categoryMenuRef = ref<HTMLElement | null>(null)
+const difficultyMenuOpen = ref(false)
+const difficultyMenuRef = ref<HTMLElement | null>(null)
 
 function onDocumentClick(e: MouseEvent) {
-  if (categoryMenuOpen.value && categoryMenuRef.value && !categoryMenuRef.value.contains(e.target as Node)) {
+  const target = e.target as Node
+  if (categoryMenuOpen.value && categoryMenuRef.value && !categoryMenuRef.value.contains(target)) {
     categoryMenuOpen.value = false
+  }
+  if (difficultyMenuOpen.value && difficultyMenuRef.value && !difficultyMenuRef.value.contains(target)) {
+    difficultyMenuOpen.value = false
   }
 }
 
@@ -93,8 +99,9 @@ function selectCategory(category: Category | null) {
   categoryMenuOpen.value = false
 }
 
-function toggleDifficulty(difficulty: Difficulty) {
-  selectedDifficulty.value = selectedDifficulty.value === difficulty ? null : difficulty
+function selectDifficulty(difficulty: Difficulty | null) {
+  selectedDifficulty.value = difficulty === selectedDifficulty.value ? null : difficulty
+  difficultyMenuOpen.value = false
 }
 </script>
 
@@ -103,20 +110,20 @@ function toggleDifficulty(difficulty: Difficulty) {
     <div class="search-wrap">
       <div class="search-row">
         <input v-model="search" class="search-input" type="search" placeholder="Hledat recept nebo ingredienci…" />
-        <div ref="categoryMenuRef" class="category-menu">
+        <div ref="categoryMenuRef" class="filter-menu">
           <button
             type="button"
-            class="category-btn"
+            class="filter-btn"
             :class="{ active: !!selectedCategory }"
             aria-label="Filtrovat podle kategorie"
             @click="categoryMenuOpen = !categoryMenuOpen"
           >
             🏷️
           </button>
-          <div v-if="categoryMenuOpen" class="category-dropdown">
+          <div v-if="categoryMenuOpen" class="filter-dropdown">
             <button
               type="button"
-              class="category-option"
+              class="filter-option"
               :class="{ active: !selectedCategory }"
               @click="selectCategory(null)"
             >
@@ -126,11 +133,43 @@ function toggleDifficulty(difficulty: Difficulty) {
               v-for="category in CATEGORIES"
               :key="category"
               type="button"
-              class="category-option"
+              class="filter-option"
               :class="{ active: selectedCategory === category }"
               @click="selectCategory(category)"
             >
               {{ CATEGORY_LABELS[category] }}
+            </button>
+          </div>
+        </div>
+        <div ref="difficultyMenuRef" class="filter-menu">
+          <button
+            type="button"
+            class="filter-btn"
+            :class="{ active: !!selectedDifficulty }"
+            aria-label="Filtrovat podle obtížnosti"
+            @click="difficultyMenuOpen = !difficultyMenuOpen"
+          >
+            🎚️
+          </button>
+          <div v-if="difficultyMenuOpen" class="filter-dropdown">
+            <button
+              type="button"
+              class="filter-option"
+              :class="{ active: !selectedDifficulty }"
+              @click="selectDifficulty(null)"
+            >
+              Vše
+            </button>
+            <button
+              v-for="difficulty in DIFFICULTIES"
+              :key="difficulty"
+              type="button"
+              class="filter-option"
+              :class="{ active: selectedDifficulty === difficulty }"
+              @click="selectDifficulty(difficulty)"
+            >
+              <span class="dot" :style="{ background: `var(--${difficulty.toLowerCase()})` }" />
+              {{ DIFFICULTY_LABELS[difficulty] }}
             </button>
           </div>
         </div>
@@ -141,15 +180,9 @@ function toggleDifficulty(difficulty: Difficulty) {
       <button v-if="selectedCategory" class="pill active" @click="selectCategory(null)">
         {{ CATEGORY_LABELS[selectedCategory] }} <span class="pill-remove">✕</span>
       </button>
-      <button
-        v-for="difficulty in DIFFICULTIES"
-        :key="difficulty"
-        class="pill"
-        :class="{ active: selectedDifficulty === difficulty }"
-        @click="toggleDifficulty(difficulty)"
-      >
-        <span class="dot" :style="{ background: `var(--${difficulty.toLowerCase()})` }" />
-        {{ DIFFICULTY_LABELS[difficulty] }}
+      <button v-if="selectedDifficulty" class="pill active" @click="selectDifficulty(null)">
+        <span class="dot" :style="{ background: `var(--${selectedDifficulty.toLowerCase()})` }" />
+        {{ DIFFICULTY_LABELS[selectedDifficulty] }} <span class="pill-remove">✕</span>
       </button>
     </div>
 
@@ -241,12 +274,12 @@ function toggleDifficulty(difficulty: Difficulty) {
   font-size: 13px;
 }
 
-.category-menu {
+.filter-menu {
   position: relative;
   flex: none;
 }
 
-.category-btn {
+.filter-btn {
   width: 42px;
   height: 100%;
   font-size: 16px;
@@ -259,11 +292,11 @@ function toggleDifficulty(difficulty: Difficulty) {
   justify-content: center;
 }
 
-.category-btn.active {
+.filter-btn.active {
   border-color: var(--accent);
 }
 
-.category-dropdown {
+.filter-dropdown {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
@@ -281,7 +314,10 @@ function toggleDifficulty(difficulty: Difficulty) {
   z-index: 20;
 }
 
-.category-option {
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   text-align: left;
   font-family: 'IBM Plex Sans', sans-serif;
   font-size: 13.5px;
@@ -293,10 +329,17 @@ function toggleDifficulty(difficulty: Difficulty) {
   cursor: pointer;
 }
 
-.category-option.active {
+.filter-option.active {
   background: rgba(184, 80, 42, 0.14);
   color: var(--accent);
   font-weight: 600;
+}
+
+.filter-option .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
 }
 
 .pill-row {
