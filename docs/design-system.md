@@ -97,9 +97,12 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 - **Icon buttons** — this app prefers a pictograph over a text label once the
   meaning is unambiguous from context: 🏷️ opens the category dropdown, 🎚️
   opens the difficulty dropdown, ☰/⊞ toggles list/card view, ↕ marks the sort
-  control, ✎/⬇ edit/export a card from the stack. Text labels stay for
-  actions that aren't self-evident from a glyph alone (Uložit, Smazat, the
-  dropdown options themselves).
+  control, ⬆ uploads a JSON file, ✎/⬇/`{}` edit/export-PNG/export-JSON a card
+  from the stack. The edit/export cluster stays in one plain, monochrome
+  symbol style (no color emoji mixed in) since those three sit side by side
+  and read as one family of actions. Text labels stay for actions that
+  aren't self-evident from a glyph alone (Uložit, Smazat, the dropdown
+  options themselves).
 - **List row** — `--surface` panel, `14px` radius, **4px left border in the
   recipe's difficulty color**, name (Display M) + meta line (Data: category ·
   time · servings), chevron.

@@ -247,7 +247,7 @@ function onKeydown(e: KeyboardEvent) {
           >
             ⬇
           </button>
-          <button class="card-action-btn" aria-label="Stáhnout JSON" @click.stop="onExportJson">📄</button>
+          <button class="card-action-btn" aria-label="Stáhnout JSON" @click.stop="onExportJson">{}</button>
         </div>
       </div>
     </div>
