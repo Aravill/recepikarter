@@ -96,7 +96,10 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   recipe's difficulty color**, name (Display M) + meta line (Data: category ·
   time · servings), chevron.
 - **Search field** — sticky under the header on the list page, `Data`-styled
-  placeholder, fuzzy match (no exact-substring requirement).
+  placeholder, fuzzy match (no exact-substring requirement). Matches across
+  Czech noun/adjective declensions too (searching "mouku" finds an ingredient
+  stored as "mouky") via a light stemmer applied to both the query and the
+  indexed text — see `shared/utils/czech-stem.ts`.
 - **Bottom sheet** — the detail page's edit form. `--surface` panel anchored
   to the bottom, `20px` top-corner radius, collapsed to a `handle` (grabber +
   "Upravit recept" label + quick download/print icons) by default; drag (or
