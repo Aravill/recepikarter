@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Recepikarter — Banner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #efe9de;
+    --text: #221f1c;
+    --text-dim: #6b6255;
+    --accent: #b8502a;
+    --easy: #6f8f5c;
+    --medium: #c98a2e;
+    --hard: #a1423a;
+    --surface: #fbf8f2;
+    --line: #d8cfbe;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    width: 1200px;
+    height: 630px;
+    background: var(--bg);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    overflow: hidden;
+    position: relative;
+  }
+  .card {
+    position: absolute;
+    width: 108px;
+    height: 150px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 24px 48px -20px rgba(36, 31, 26, 0.28);
+  }
+  .card .stripe { height: 30px; }
+  .card.easy .stripe { background: var(--easy); }
+  .card.medium .stripe { background: var(--medium); }
+  .card.hard .stripe { background: var(--hard); }
+
+  .c1 { top: 58px;  left: 92px;  transform: rotate(-14deg); }
+  .c2 { top: 392px; left: 120px; transform: rotate(9deg); }
+  .c3 { top: 66px;  right: 108px; transform: rotate(11deg); }
+  .c4 { top: 380px; right: 88px;  transform: rotate(-8deg); }
+
+  .hero {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+  }
+  .mark {
+    width: 84px;
+    height: 84px;
+  }
+  .wordmark {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: 64px;
+    color: var(--text);
+    line-height: 1;
+  }
+  .tagline {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+  <div class="card easy c1"><div class="stripe"></div></div>
+  <div class="card medium c2"><div class="stripe"></div></div>
+  <div class="card hard c3"><div class="stripe"></div></div>
+  <div class="card easy c4"><div class="stripe"></div></div>
+
+  <div class="hero">
+    <svg class="mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="card"><rect x="4" y="4" width="56" height="56" rx="14" ry="14" /></clipPath>
+      </defs>
+      <rect x="4" y="4" width="56" height="56" rx="14" ry="14" fill="#fbf8f2" stroke="#d8cfbe" stroke-width="2" />
+      <rect x="4" y="4" width="56" height="16" fill="#b8502a" clip-path="url(#card)" />
+    </svg>
+    <div class="wordmark">Recepikarter</div>
+    <div class="tagline">Kartotéka receptů</div>
+  </div>
+</body>
+</html>
