@@ -82,8 +82,16 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   actions (Cancel, Print).
 - **Input / select / textarea** — sit on `--surface` panels only (never
   directly on `--bg`); `1px --rule` border, `--accent` focus ring.
-- **Pill** — category filter: outline, neutral. Difficulty filter: filled
-  with the difficulty token at low opacity, dot in the solid color.
+- **Pill** — difficulty filter: filled with the difficulty token at low
+  opacity, dot in the solid color, always all shown. Category filter is a
+  single accent-filled pill that only appears once a category is picked (✕
+  to clear) — the category list itself lives behind the 🏷️ dropdown button
+  next to the search field, not as always-visible pills.
+- **Icon buttons** — this app prefers a pictograph over a text label once the
+  meaning is unambiguous from context: 🏷️ opens the category dropdown, ☰/⊞
+  toggles list/card view, ↕ marks the sort control. Text labels stay for
+  actions that aren't self-evident from a glyph alone (Uložit, Smazat, the
+  category options themselves).
 - **List row** — `--surface` panel, `14px` radius, **4px left border in the
   recipe's difficulty color**, name (Display M) + meta line (Data: category ·
   time · servings), chevron.
@@ -94,12 +102,27 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   "Upravit recept" label + quick download/print icons) by default; drag (or
   tap the handle) to expand it over the preview. Save/Delete pinned at its
   bottom, outside the scrollable form area.
+- **Card stack** — the list page's default view. Up to three cards layered
+  behind the active one, each further back scaled down and faded slightly —
+  reads like a phone's app-switcher deck. Drag the top card left/right to
+  move to the previous/next match in the current search+filter+sort order
+  (clamped at the ends, no wraparound); a small ‹ *n* / *total* › row below
+  the deck does the same by click, for non-touch input. Tapping the top card
+  without dragging opens its detail page. A small flip button in the card's
+  corner flips it between front/back (3D flip, mirrors the front/back tabs
+  on the detail page's preview) without leaving the stack.
 
 ## Pages
 
 1. **Login** — username + password, nothing else. No self-registration.
-2. **List** — search (fuzzy) + category/difficulty filter pills + sort
-   (name / time / difficulty / last updated) → list of rows.
+2. **List** — search (fuzzy), with a 🏷️ category-picker dropdown next to the
+   search field and always-visible difficulty pills, plus sort (name / time
+   / difficulty / last updated, behind an ↕ icon). Defaults to the card
+   stack (see Components); a ☰/⊞ icon button toggles a traditional row list,
+   and back. Changing the search, filter, or sort resets browsing to the
+   first card. Result count reads "Nalezeno: *n*", not a grammatically
+   pluralized "*n* receptů" — simpler, and avoids Czech's three-way plural
+   agreement entirely.
 3. **Detail** — one page for view, edit, *and* create. On mobile, opens
    straight onto the full pre-rendered card preview (front/back tabs) —
    reading a recipe never starts with text boxes. Editing lives in the
