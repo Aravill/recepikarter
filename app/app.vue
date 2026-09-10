@@ -10,6 +10,25 @@ async function onLogout() {
   await clear()
   await navigateTo('/login')
 }
+
+// Shown only on the specific click that switches light -> dark (see
+// ThemeToggle's 'activated-dark' emit), not whenever dark happens to
+// already be the active theme.
+const showDarkModeToast = ref(false)
+let darkModeToastTimer: ReturnType<typeof setTimeout> | null = null
+
+function onActivatedDark() {
+  showDarkModeToast.value = true
+  if (darkModeToastTimer) clearTimeout(darkModeToastTimer)
+  darkModeToastTimer = setTimeout(() => {
+    showDarkModeToast.value = false
+  }, 6000)
+}
+
+function dismissDarkModeToast() {
+  showDarkModeToast.value = false
+  if (darkModeToastTimer) clearTimeout(darkModeToastTimer)
+}
 </script>
 
 <template>
@@ -21,12 +40,18 @@ async function onLogout() {
         Recepikarter
       </NuxtLink>
       <div class="header-actions">
+        <ThemeToggle @activated-dark="onActivatedDark" />
         <button class="logout-btn" @click="onLogout">Odhlásit</button>
       </div>
     </header>
     <main class="app-main">
       <NuxtPage />
     </main>
+    <InfoToast
+      v-if="showDarkModeToast"
+      message="Tmavý režim je zapnutý. Stažené karty receptů se ale pořád vygenerují ve světlém režimu, aby šetřily inkoust v tiskárně."
+      @dismiss="dismissDarkModeToast"
+    />
   </div>
 </template>
 
@@ -47,6 +72,27 @@ async function onLogout() {
   --hard: #a1423a;
 
   color-scheme: light;
+}
+
+/* Dark theme overrides — same token names, same hue families (warm
+   paper/ink, not hue-inverted), lifted for contrast on a near-black (not
+   pure-black) ground. Full palette + rationale: docs/dark-mode.md. */
+:root[data-theme='dark'] {
+  --bg: #1c1a17;
+  --bg-raised: #262320;
+  --line: #3a352e;
+  --text: #ede7da;
+  --text-dim: #a89e8c;
+  --surface: #23201c;
+  --surface-ink: #ede7da;
+  --surface-ink-dim: #a89e8c;
+  --rule: #383329;
+  --accent: #d97a4f;
+  --easy: #86a874;
+  --medium: #dba653;
+  --hard: #c15c52;
+
+  color-scheme: dark;
 }
 
 * {

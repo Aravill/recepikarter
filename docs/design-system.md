@@ -7,8 +7,11 @@ update the file first, then the page.
 **Direction:** light, minimal "kitchen counter" shell with warm paper-colored
 surfaces for anything recipe-related (list rows, the detail panel, the login
 card). This mirrors the physical card itself — laminated paper on a counter —
-so the web app and the printed object read as the same product. Committed
-single theme (no light/dark toggle for now).
+so the web app and the printed object read as the same product. The palette
+below is the light theme, the default; a dark theme is layered on top of it
+via `[data-theme='dark']` token overrides — see `docs/dark-mode.md` for the
+full dark palette, the toggle, and why exported/printed cards always stay
+light.
 
 **Unifying motif:** the difficulty stripe. The printed card carries a
 difficulty-colored band across the top (see `card-example-front.svg` /
@@ -30,6 +33,9 @@ both the physical and digital object.
 | `--surface-ink-dim` | `#6b6255` | Secondary text on `--surface` |
 | `--rule` | `#e6ddc9` | Dividers on `--surface` |
 | `--accent` | `#b8502a` | Brand accent: links, primary actions, focus |
+
+Dark-mode values for every token above live in `docs/dark-mode.md`, not
+duplicated here to avoid the two drifting out of sync.
 
 Difficulty (the stripe — used nowhere else, so it always means the same thing):
 

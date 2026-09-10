@@ -96,7 +96,7 @@ async function onSubmit() {
   padding: 11px 12px;
   border-radius: 8px;
   border: 1px solid var(--rule);
-  background: #fff;
+  background: var(--surface);
   color: var(--surface-ink);
 }
 

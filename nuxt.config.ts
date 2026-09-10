@@ -19,6 +19,17 @@ export default defineNuxtConfig({
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
       ],
+      script: [
+        {
+          // Anti-flash: applies a persisted dark theme to <html> before
+          // first paint, straight from localStorage, ahead of Vue
+          // hydration. Keep the storage key in sync with
+          // app/composables/useTheme.ts (THEME_STORAGE_KEY) and
+          // app/plugins/theme.client.ts.
+          innerHTML:
+            "(function(){try{if(localStorage.getItem('recepikarter-theme')==='dark'){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}})()",
+        },
+      ],
     },
   },
 })
