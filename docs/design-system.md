@@ -4,11 +4,11 @@ Single source of truth for styling across the app (login, list, detail) and
 the printable card. If a page's CSS disagrees with this file, the file wins —
 update the file first, then the page.
 
-**Direction:** dark, minimal "kitchen counter" shell with warm paper-colored
+**Direction:** light, minimal "kitchen counter" shell with warm paper-colored
 surfaces for anything recipe-related (list rows, the detail panel, the login
-card). This mirrors the physical card itself — laminated paper on a dark
-counter — so the web app and the printed object read as the same product.
-Committed single theme (no light/dark toggle for now).
+card). This mirrors the physical card itself — laminated paper on a counter —
+so the web app and the printed object read as the same product. Committed
+single theme (no light/dark toggle for now).
 
 **Unifying motif:** the difficulty stripe. The printed card carries a
 difficulty-colored band across the top (see `card-example-front.svg` /
@@ -20,15 +20,15 @@ both the physical and digital object.
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--bg` | `#1b1815` | App shell background |
-| `--bg-raised` | `#241f1a` | Header/nav bar, raised panels on the shell |
-| `--line` | `#33302a` | Hairlines/borders on the dark shell |
-| `--text` | `#efe9de` | Primary text on the dark shell |
-| `--text-dim` | `#a89f8f` | Secondary text on the dark shell |
-| `--surface` | `#efe9de` | Paper surface: list rows, detail panel, login card |
+| `--bg` | `#efe9de` | App shell background |
+| `--bg-raised` | `#e3dbc8` | Header/nav bar, raised panels on the shell |
+| `--line` | `#d8cfbe` | Hairlines/borders on the shell |
+| `--text` | `#221f1c` | Primary text on the shell |
+| `--text-dim` | `#6b6255` | Secondary text on the shell |
+| `--surface` | `#fbf8f2` | Paper surface: list rows, detail panel, login card |
 | `--surface-ink` | `#221f1c` | Primary text on `--surface` |
 | `--surface-ink-dim` | `#6b6255` | Secondary text on `--surface` |
-| `--rule` | `#d8cfbe` | Dividers on `--surface` |
+| `--rule` | `#e6ddc9` | Dividers on `--surface` |
 | `--accent` | `#b8502a` | Brand accent: links, primary actions, focus |
 
 Difficulty (the stripe — used nowhere else, so it always means the same thing):
@@ -72,7 +72,8 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   scale, don't reconcile the two.
 - Max content width: `640px`, centered — this is a personal recipe box, not a
   dashboard; a single readable column beats a wide layout on every screen
-  size, mobile included.
+  size, mobile included. **Exception:** the detail page at desktop widths
+  (see below) — screen efficiency wins there over the single-column rule.
 
 ## Components
 
@@ -99,11 +100,17 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 1. **Login** — username + password, nothing else. No self-registration.
 2. **List** — search (fuzzy) + category/difficulty filter pills + sort
    (name / time / difficulty / last updated) → list of rows.
-3. **Detail** — one page for view, edit, *and* create. Opens straight onto
-   the full pre-rendered card preview (front/back tabs) — reading a recipe
-   never starts with text boxes. Editing lives in the bottom sheet, collapsed
-   by default. Creating a new recipe opens the same layout with the sheet
-   already expanded (nothing to preview yet), empty fields, no Delete button.
+3. **Detail** — one page for view, edit, *and* create. On mobile, opens
+   straight onto the full pre-rendered card preview (front/back tabs) —
+   reading a recipe never starts with text boxes. Editing lives in the
+   bottom sheet, collapsed by default. Creating a new recipe opens the same
+   layout with the sheet already expanded (nothing to preview yet), empty
+   fields, no Delete button. **At desktop widths (≥900px)** the same markup
+   switches to a two-column layout instead — edit panel on the left, the
+   card preview sticky on the right — since there's room for both at once
+   and the drag-to-expand sheet interaction doesn't make sense with a mouse.
+   The sheet is always fully shown (its collapse/expand state becomes a
+   no-op); nothing else about the page changes.
 
 ## Reference files
 

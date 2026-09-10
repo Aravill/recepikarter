@@ -76,8 +76,9 @@ async function onDelete() {
   </div>
 
   <div v-else class="detail-screen">
+    <button class="floating-back" aria-label="Zpět" @click="navigateTo('/')">‹</button>
+
     <div class="detail-preview">
-      <button class="floating-back" aria-label="Zpět" @click="navigateTo('/')">‹</button>
       <div class="preview-tabs">
         <button :class="{ active: side === 'front' }" @click="side = 'front'">Přední strana</button>
         <button :class="{ active: side === 'back' }" @click="side = 'back'">Zadní strana</button>
@@ -153,8 +154,8 @@ async function onDelete() {
   height: 34px;
   border-radius: 50%;
   background: rgba(36, 31, 26, 0.72);
-  border: 1px solid var(--line);
-  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fdf9f2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -325,5 +326,65 @@ async function onDelete() {
   background: transparent;
   color: var(--hard);
   border: 1px solid var(--hard);
+}
+
+/* Desktop: edit panel and preview sit side by side instead of the mobile
+   drag-up sheet over a full-screen preview. Same markup either way — this
+   swaps the two panels from an absolute-positioned stack into a two-column
+   grid, which makes the sheet's expand/collapse state irrelevant (it's
+   always fully shown), so no script changes are needed. */
+@media (min-width: 900px) {
+  .detail-screen {
+    position: static;
+    min-height: auto;
+    overflow: visible;
+    margin: 0 auto;
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    gap: 16px 32px;
+    padding: 32px 0 56px;
+  }
+
+  /* Explicit grid-row on every item: without it, grid's default sparse
+     packing would push the sheet (column 1) to row 2, since it comes after
+     the preview (column 2) in DOM order and packing doesn't backfill an
+     earlier column once the placement cursor has moved past it. */
+  .floating-back {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    position: static;
+    justify-self: start;
+  }
+
+  .detail-preview {
+    grid-column: 2;
+    grid-row: 2;
+    position: sticky;
+    inset: auto;
+    top: 32px;
+    padding-top: 0;
+  }
+
+  .sheet {
+    grid-column: 1;
+    grid-row: 2;
+    position: static;
+    height: auto;
+    border-radius: 14px;
+    border: 1px solid var(--rule);
+    box-shadow: none;
+  }
+
+  .sheet-handle {
+    cursor: default;
+  }
+
+  .sheet-grabber,
+  .sheet-handle-label .chevron {
+    display: none;
+  }
 }
 </style>

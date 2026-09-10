@@ -30,21 +30,21 @@ async function onLogout() {
 
 <style>
 :root {
-  --bg: #1b1815;
-  --bg-raised: #241f1a;
-  --line: #33302a;
-  --text: #efe9de;
-  --text-dim: #a89f8f;
-  --surface: #efe9de;
+  --bg: #efe9de;
+  --bg-raised: #e3dbc8;
+  --line: #d8cfbe;
+  --text: #221f1c;
+  --text-dim: #6b6255;
+  --surface: #fbf8f2;
   --surface-ink: #221f1c;
   --surface-ink-dim: #6b6255;
-  --rule: #d8cfbe;
+  --rule: #e6ddc9;
   --accent: #b8502a;
   --easy: #6f8f5c;
   --medium: #c98a2e;
   --hard: #a1423a;
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * {
@@ -126,9 +126,7 @@ a {
 
 .app-main {
   flex: 1;
-  max-width: 640px;
   width: 100%;
-  margin: 0 auto;
   padding: 18px;
 }
 </style>

@@ -157,6 +157,8 @@ function recipeCountLabel(n: number) {
 .list-page {
   display: flex;
   flex-direction: column;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 .search-wrap {
