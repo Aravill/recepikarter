@@ -94,12 +94,24 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   "Upravit recept" label + quick download/print icons) by default; drag (or
   tap the handle) to expand it over the preview. Save/Delete pinned at its
   bottom, outside the scrollable form area.
+- **Card stack** — the list page's default view. Up to three cards layered
+  behind the active one, each further back scaled down and faded slightly —
+  reads like a phone's app-switcher deck. Drag the top card left/right to
+  move to the previous/next match in the current search+filter+sort order
+  (clamped at the ends, no wraparound); a small ‹ *n* / *total* › row below
+  the deck does the same by click, for non-touch input. Tapping the top card
+  without dragging opens its detail page. A small flip button in the card's
+  corner flips it between front/back (3D flip, mirrors the front/back tabs
+  on the detail page's preview) without leaving the stack.
 
 ## Pages
 
 1. **Login** — username + password, nothing else. No self-registration.
 2. **List** — search (fuzzy) + category/difficulty filter pills + sort
-   (name / time / difficulty / last updated) → list of rows.
+   (name / time / difficulty / last updated). Defaults to the card stack
+   (see Components); a "Zobrazit seznam" toggle switches to a traditional
+   row list, and back ("Zobrazit karty"). Changing the search, filter, or
+   sort resets browsing to the first card.
 3. **Detail** — one page for view, edit, *and* create. On mobile, opens
    straight onto the full pre-rendered card preview (front/back tabs) —
    reading a recipe never starts with text boxes. Editing lives in the

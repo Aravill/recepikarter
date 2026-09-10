@@ -10,6 +10,7 @@ const search = ref('')
 const selectedCategory = ref<Category | null>(null)
 const selectedDifficulty = ref<Difficulty | null>(null)
 const sortBy = ref<'updated' | 'name' | 'time' | 'difficulty'>('updated')
+const viewMode = ref<'cards' | 'list'>('cards')
 
 function normalize(s: string) {
   return s
@@ -113,6 +114,9 @@ function recipeCountLabel(n: number) {
 
     <div class="sort-row">
       <span class="count">{{ pending ? 'Načítám…' : recipeCountLabel(sorted.length) }}</span>
+      <button type="button" class="view-toggle" @click="viewMode = viewMode === 'cards' ? 'list' : 'cards'">
+        {{ viewMode === 'cards' ? 'Zobrazit seznam' : 'Zobrazit karty' }}
+      </button>
       <label class="sort-by">
         Řadit:
         <select v-model="sortBy">
@@ -128,6 +132,8 @@ function recipeCountLabel(n: number) {
       Nemáte žádné recepty. <NuxtLink to="/recipes/new">Vytvořte první</NuxtLink>.
     </p>
     <p v-else-if="!pending && !sorted.length" class="empty">Žádné recepty neodpovídají hledání ani filtru.</p>
+
+    <CardStack v-else-if="viewMode === 'cards'" :recipes="sorted" />
 
     <div v-else class="list">
       <NuxtLink
@@ -221,6 +227,8 @@ function recipeCountLabel(n: number) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 8px;
   padding-bottom: 14px;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 11.5px;
@@ -228,6 +236,17 @@ function recipeCountLabel(n: number) {
 
 .count {
   color: var(--text-dim);
+}
+
+.view-toggle {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
 }
 
 .sort-by {
