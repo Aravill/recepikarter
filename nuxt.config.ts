@@ -3,6 +3,15 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   modules: ['nuxt-auth-utils', '@nuxt/eslint'],
+  runtimeConfig: {
+    session: {
+      // h3 defaults the session cookie to Secure, which browsers silently
+      // drop on a plain-HTTP origin. This deploys with no reverse proxy/TLS
+      // in front (see CLAUDE.md), so Secure would make login look like it
+      // works (200 OK) while never actually setting the cookie.
+      cookie: { secure: false },
+    },
+  },
   app: {
     head: {
       htmlAttrs: { lang: 'cs' },
