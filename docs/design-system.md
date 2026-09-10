@@ -90,8 +90,9 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 - **Icon buttons** — this app prefers a pictograph over a text label once the
   meaning is unambiguous from context: 🏷️ opens the category dropdown, 🎚️
   opens the difficulty dropdown, ☰/⊞ toggles list/card view, ↕ marks the sort
-  control. Text labels stay for actions that aren't self-evident from a glyph
-  alone (Uložit, Smazat, the dropdown options themselves).
+  control, ✎/⬇ edit/export a card from the stack. Text labels stay for
+  actions that aren't self-evident from a glyph alone (Uložit, Smazat, the
+  dropdown options themselves).
 - **List row** — `--surface` panel, `14px` radius, **4px left border in the
   recipe's difficulty color**, name (Display M) + meta line (Data: category ·
   time · servings), chevron.
@@ -110,10 +111,15 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   reads like a phone's app-switcher deck. Drag the top card left/right to
   move to the previous/next match in the current search+filter+sort order
   (clamped at the ends, no wraparound); a small ‹ *n* / *total* › row below
-  the deck does the same by click, for non-touch input. Tapping the top card
-  without dragging opens its detail page. A small flip button in the card's
-  corner flips it between front/back (3D flip, mirrors the front/back tabs
-  on the detail page's preview) without leaving the stack.
+  the deck does the same by click, for non-touch input. A tap (no drag) flips
+  the top card between front/back (3D flip, mirrors the front/back tabs on
+  the detail page's preview) — no visible flip button, since the gesture
+  itself is the control. Holding the card still (not dragging) instead
+  reveals two buttons in its corner — ✎ opens the recipe's detail/edit page,
+  ⬇ exports it — hidden the rest of the time so they don't clutter the card;
+  tapping anywhere while they're shown dismisses them back to the standard
+  tap-to-flip/drag-to-swipe interactions, same gesture on touch and with a
+  mouse alike.
 
 ## Pages
 
