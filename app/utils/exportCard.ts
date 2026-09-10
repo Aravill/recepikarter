@@ -24,25 +24,42 @@ export async function exportCardPng(frontEl: HTMLElement, backEl: HTMLElement, r
   // regardless. Skipping the embed attempt avoids that noise; the canvas
   // still rasterizes with the already-loaded fonts correctly either way.
   const opts = { pixelRatio: 3, cacheBust: true, skipFonts: true }
-  const frontCanvas = await toCanvas(frontEl, opts)
-  // The back face carries its own `transform: rotateY(180deg)` — the
-  // flip-card trick that makes it read right-way-round once the shared
-  // parent also rotates 180deg on screen. Captured on its own, outside that
-  // parent rotation, the raw transform bakes into the raster as a flipped
-  // image instead. Override it to `none` for the capture only.
-  const backCanvas = await toCanvas(backEl, { ...opts, style: { transform: 'none' } })
 
-  const gap = 72 // px at the 3x pixelRatio above, i.e. a 24 CSS px gap
-  const combined = document.createElement('canvas')
-  combined.width = frontCanvas.width + backCanvas.width + gap
-  combined.height = Math.max(frontCanvas.height, backCanvas.height)
-  const ctx = combined.getContext('2d')
-  if (!ctx) throw new Error('2D canvas context unavailable')
-  ctx.drawImage(frontCanvas, 0, 0)
-  ctx.drawImage(backCanvas, frontCanvas.width + gap, 0)
+  // The card faces read their colors from CSS custom properties (--surface,
+  // --accent, etc.), which toCanvas resolves via computed style at capture
+  // time. Exported/printed cards must always come out light regardless of
+  // the app's current theme (to save printer ink, and because the exported
+  // PNG is meant to match the physical laminated card) — so force the light
+  // palette on <html> for the duration of the capture rather than reading
+  // live theme state, and always restore whatever was active before,
+  // even if capture throws.
+  const root = document.documentElement
+  const previousTheme = root.getAttribute('data-theme')
+  root.setAttribute('data-theme', 'light')
+  try {
+    const frontCanvas = await toCanvas(frontEl, opts)
+    // The back face carries its own `transform: rotateY(180deg)` — the
+    // flip-card trick that makes it read right-way-round once the shared
+    // parent also rotates 180deg on screen. Captured on its own, outside
+    // that parent rotation, the raw transform bakes into the raster as a
+    // flipped image instead. Override it to `none` for the capture only.
+    const backCanvas = await toCanvas(backEl, { ...opts, style: { transform: 'none' } })
 
-  const link = document.createElement('a')
-  link.href = combined.toDataURL('image/png')
-  link.download = `${slugify(recipeName)}.png`
-  link.click()
+    const gap = 72 // px at the 3x pixelRatio above, i.e. a 24 CSS px gap
+    const combined = document.createElement('canvas')
+    combined.width = frontCanvas.width + backCanvas.width + gap
+    combined.height = Math.max(frontCanvas.height, backCanvas.height)
+    const ctx = combined.getContext('2d')
+    if (!ctx) throw new Error('2D canvas context unavailable')
+    ctx.drawImage(frontCanvas, 0, 0)
+    ctx.drawImage(backCanvas, frontCanvas.width + gap, 0)
+
+    const link = document.createElement('a')
+    link.href = combined.toDataURL('image/png')
+    link.download = `${slugify(recipeName)}.png`
+    link.click()
+  } finally {
+    if (previousTheme) root.setAttribute('data-theme', previousTheme)
+    else root.removeAttribute('data-theme')
+  }
 }
