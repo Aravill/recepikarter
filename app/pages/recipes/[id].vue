@@ -26,41 +26,21 @@ const saving = ref(false)
 const deleting = ref(false)
 const exporting = ref(false)
 const errorMsg = ref('')
-const cardRef = ref<{ $el: HTMLElement } | null>(null)
+const frontFaceRef = ref<{ $el: HTMLElement } | null>(null)
+const backFaceRef = ref<{ $el: HTMLElement } | null>(null)
 
 function toggleSheet() {
   sheetExpanded.value = !sheetExpanded.value
 }
 
-function slugify(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return slug || 'recept'
-}
-
 async function onExportPng() {
-  const el = cardRef.value?.$el
-  if (!el) return
+  const frontEl = frontFaceRef.value?.$el
+  const backEl = backFaceRef.value?.$el
+  if (!frontEl || !backEl) return
   errorMsg.value = ''
   exporting.value = true
   try {
-    // Loaded on demand: html-to-image touches the DOM/canvas, so it must
-    // never be evaluated during SSR.
-    const { toPng } = await import('html-to-image')
-    // skipFonts: the fonts are Google Fonts loaded cross-origin, so
-    // html-to-image can't read their stylesheet to embed them (a CORS
-    // restriction on CSSOM access) — it logs a caught error and continues
-    // regardless. Skipping the embed attempt avoids that noise; the canvas
-    // still rasterizes with the already-loaded fonts correctly either way.
-    const dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: true, skipFonts: true })
-    const link = document.createElement('a')
-    link.href = dataUrl
-    link.download = `${slugify(form.value.name)}-${side.value === 'front' ? 'predni' : 'zadni'}.png`
-    link.click()
+    await exportCardPng(frontEl, backEl, form.value.name)
     // Only a saved recipe has an id to record against; a new, unsaved one
     // has nothing in the DB yet to mark.
     if (!isNew.value) await markExported(recipeId.value)
@@ -131,7 +111,10 @@ async function onDelete() {
         <button :class="{ active: side === 'back' }" @click="side = 'back'">Zadní strana</button>
       </div>
 
-      <RecipeCard ref="cardRef" :recipe="form" :side="side" />
+      <div class="flip-inner" :class="{ flipped: side === 'back' }">
+        <RecipeCard ref="frontFaceRef" class="face face-front" :recipe="form" side="front" />
+        <RecipeCard ref="backFaceRef" class="face face-back" :recipe="form" side="back" />
+      </div>
     </div>
 
     <div class="sheet" :class="{ expanded: sheetExpanded }">
@@ -191,6 +174,29 @@ async function onDelete() {
   align-items: center;
   padding-top: 20px;
   gap: 16px;
+  perspective: 1400px;
+}
+
+.flip-inner {
+  position: relative;
+  width: 240px;
+  height: 502px;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flip-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.face-back {
+  transform: rotateY(180deg);
 }
 
 .floating-back {
@@ -458,6 +464,7 @@ async function onDelete() {
     padding-top: 0;
   }
 
+  .flip-inner,
   :deep(.card-preview) {
     width: 71.8mm;
     height: 150.5mm;

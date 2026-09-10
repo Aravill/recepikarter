@@ -3,6 +3,8 @@ import type { Recipe } from '#shared/types/recipe'
 
 const props = defineProps<{ recipes: Recipe[] }>()
 
+const { markExported } = useRecipes()
+
 const TAP_THRESHOLD = 8
 const SWIPE_THRESHOLD = 90
 const FLY_OUT_DISTANCE = 600
@@ -11,6 +13,9 @@ const index = ref(0)
 const flipped = ref(false)
 const dragX = ref(0)
 const dragging = ref(false)
+const exporting = ref(false)
+const frontFaceRef = ref<{ $el: HTMLElement } | null>(null)
+const backFaceRef = ref<{ $el: HTMLElement } | null>(null)
 
 let startX = 0
 let pointerId: number | null = null
@@ -43,8 +48,25 @@ function toggleFlip() {
   flipped.value = !flipped.value
 }
 
+async function onExportPng() {
+  const frontEl = frontFaceRef.value?.$el
+  const backEl = backFaceRef.value?.$el
+  const recipe = current.value
+  if (!frontEl || !backEl || !recipe) return
+  exporting.value = true
+  try {
+    await exportCardPng(frontEl, backEl, recipe.name)
+    await markExported(recipe.id)
+  } catch {
+    // Quick-access export from the browse screen — on failure the user can
+    // still export (and see an error) from the recipe's own detail page.
+  } finally {
+    exporting.value = false
+  }
+}
+
 function onPointerDown(e: PointerEvent) {
-  if ((e.target as HTMLElement).closest('.flip-btn')) return
+  if ((e.target as HTMLElement).closest('.card-action-btn')) return
   dragging.value = true
   movedPastTapThreshold = false
   startX = e.clientX
@@ -125,10 +147,20 @@ function onKeydown(e: KeyboardEvent) {
         @pointercancel="onPointerUp"
       >
         <div class="flip-inner" :class="{ flipped }">
-          <RecipeCard class="face face-front" :recipe="current" side="front" />
-          <RecipeCard class="face face-back" :recipe="current" side="back" />
+          <RecipeCard ref="frontFaceRef" class="face face-front" :recipe="current" side="front" />
+          <RecipeCard ref="backFaceRef" class="face face-back" :recipe="current" side="back" />
         </div>
-        <button class="flip-btn" aria-label="Otočit kartu" @click.stop="toggleFlip">⟳</button>
+        <div class="card-actions">
+          <button class="card-action-btn" aria-label="Otočit kartu" @click.stop="toggleFlip">⟳</button>
+          <button
+            class="card-action-btn"
+            aria-label="Stáhnout PNG"
+            :disabled="exporting"
+            @click.stop="onExportPng"
+          >
+            ⬇
+          </button>
+        </div>
       </div>
     </div>
 
@@ -205,10 +237,17 @@ function onKeydown(e: KeyboardEvent) {
   transform: rotateY(180deg);
 }
 
-.flip-btn {
+.card-actions {
   position: absolute;
   top: 10px;
   right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1;
+}
+
+.card-action-btn {
   width: 30px;
   height: 30px;
   border-radius: 50%;
@@ -220,7 +259,11 @@ function onKeydown(e: KeyboardEvent) {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 1;
+}
+
+.card-action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .stack-nav {
