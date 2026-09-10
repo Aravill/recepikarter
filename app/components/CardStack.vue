@@ -8,9 +8,11 @@ const { markExported } = useRecipes()
 const TAP_THRESHOLD = 8
 const SWIPE_THRESHOLD = 90
 const FLY_OUT_DISTANCE = 600
+const LONG_PRESS_MS = 450
 
 const index = ref(0)
 const flipped = ref(false)
+const actionsShown = ref(false)
 const dragX = ref(0)
 const dragging = ref(false)
 const exporting = ref(false)
@@ -20,6 +22,8 @@ const backFaceRef = ref<{ $el: HTMLElement } | null>(null)
 let startX = 0
 let pointerId: number | null = null
 let movedPastTapThreshold = false
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+let longPressFired = false
 
 const current = computed(() => props.recipes[index.value])
 const canGoPrev = computed(() => index.value > 0)
@@ -37,16 +41,14 @@ watch(
   () => {
     index.value = 0
     flipped.value = false
+    actionsShown.value = false
   },
 )
 
 watch(index, () => {
   flipped.value = false
+  actionsShown.value = false
 })
-
-function toggleFlip() {
-  flipped.value = !flipped.value
-}
 
 async function onExportPng() {
   const frontEl = frontFaceRef.value?.$el
@@ -65,33 +67,72 @@ async function onExportPng() {
   }
 }
 
+function onEdit() {
+  if (current.value) navigateTo(`/recipes/${current.value.id}`)
+}
+
+function clearLongPressTimer() {
+  if (longPressTimer !== null) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
 function onPointerDown(e: PointerEvent) {
   if ((e.target as HTMLElement).closest('.card-action-btn')) return
   dragging.value = true
   movedPastTapThreshold = false
+  longPressFired = false
   startX = e.clientX
   pointerId = e.pointerId
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+
+  // Holding still (not dragging) for LONG_PRESS_MS reveals the edit/download
+  // buttons instead of flipping the card.
+  clearLongPressTimer()
+  longPressTimer = setTimeout(() => {
+    if (!movedPastTapThreshold) {
+      longPressFired = true
+      actionsShown.value = true
+    }
+  }, LONG_PRESS_MS)
 }
 
 function onPointerMove(e: PointerEvent) {
   if (!dragging.value || e.pointerId !== pointerId) return
+  if (longPressFired) return
   dragX.value = e.clientX - startX
-  if (Math.abs(dragX.value) > TAP_THRESHOLD) movedPastTapThreshold = true
+  if (Math.abs(dragX.value) > TAP_THRESHOLD) {
+    movedPastTapThreshold = true
+    clearLongPressTimer()
+  }
 }
 
 function onPointerUp(e: PointerEvent) {
   if (!dragging.value || e.pointerId !== pointerId) return
   dragging.value = false
   pointerId = null
+  clearLongPressTimer()
+
+  if (longPressFired) {
+    // The long press already revealed the actions; releasing shouldn't also
+    // flip the card.
+    longPressFired = false
+    return
+  }
+
   const dx = dragX.value
 
   if (!movedPastTapThreshold) {
     dragX.value = 0
-    if (current.value) navigateTo(`/recipes/${current.value.id}`)
+    // A tap while the actions are showing dismisses them and reverts to the
+    // standard interactions, rather than also flipping the card.
+    if (actionsShown.value) actionsShown.value = false
+    else flipped.value = !flipped.value
     return
   }
 
+  actionsShown.value = false
   const wantsNext = dx < 0
   const canGo = wantsNext ? canGoNext.value : canGoPrev.value
 
@@ -150,8 +191,8 @@ function onKeydown(e: KeyboardEvent) {
           <RecipeCard ref="frontFaceRef" class="face face-front" :recipe="current" side="front" />
           <RecipeCard ref="backFaceRef" class="face face-back" :recipe="current" side="back" />
         </div>
-        <div class="card-actions">
-          <button class="card-action-btn" aria-label="Otočit kartu" @click.stop="toggleFlip">⟳</button>
+        <div class="card-actions" :class="{ shown: actionsShown }">
+          <button class="card-action-btn" aria-label="Upravit recept" @click.stop="onEdit">✎</button>
           <button
             class="card-action-btn"
             aria-label="Stáhnout PNG"
@@ -237,6 +278,9 @@ function onKeydown(e: KeyboardEvent) {
   transform: rotateY(180deg);
 }
 
+/* Hidden by default on every input type — holding the card (not dragging)
+   reveals them; tapping the card flips it instead of opening the buttons,
+   and tapping anywhere while they're shown dismisses them again. */
 .card-actions {
   position: absolute;
   top: 10px;
@@ -245,6 +289,18 @@ function onKeydown(e: KeyboardEvent) {
   flex-direction: column;
   gap: 8px;
   z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(8px, -8px) scale(0.85);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.card-actions.shown {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(0, 0) scale(1);
 }
 
 .card-action-btn {
