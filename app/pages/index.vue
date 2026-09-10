@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Fuse from 'fuse.js'
+import { czechStemLight } from '#shared/utils/czech-stem'
 import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { Category, Difficulty, Recipe } from '#shared/types/recipe'
 
@@ -23,11 +24,19 @@ function onDocumentClick(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', onDocumentClick))
 onUnmounted(() => document.removeEventListener('click', onDocumentClick))
 
+// Czech declines nouns/adjectives across cases ("mouka"/"mouky"/"moukou"),
+// so plain substring/fuzzy matching on raw text misses most real searches.
+// Stemming each word first (before stripping diacritics — the stemmer's
+// suffix rules rely on them) collapses those forms to a shared stem, applied
+// identically to both indexed text and the live query below.
 function normalize(s: string) {
-  return s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+  const stemmed = s
     .toLowerCase()
+    .split(/[\s,;.()]+/)
+    .filter(Boolean)
+    .map((word) => czechStemLight(word))
+    .join(' ')
+  return stemmed.normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
 interface SearchableRecipe extends Recipe {
