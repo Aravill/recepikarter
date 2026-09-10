@@ -31,6 +31,7 @@ let movedPastTapThreshold = false
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let longPressFired = false
 let flipTimer: ReturnType<typeof setTimeout> | null = null
+let flipGeneration = 0
 
 const current = computed(() => props.recipes[index.value])
 const canGoPrev = computed(() => index.value > 0)
@@ -56,14 +57,25 @@ function clearFlipTimer() {
 }
 
 function setFlipped(next: boolean) {
-  flipped.value = next
   flipping.value = true
   clearFlipTimer()
-  // Matches .flip-inner's 0.5s transition, plus a small buffer.
-  flipTimer = setTimeout(() => {
-    flipping.value = false
-    flipTimer = null
-  }, 520)
+  const generation = ++flipGeneration
+  // Firefox for Android needs the 3D rendering context (perspective +
+  // preserve-3d, both gated on `flipping`) painted at least one frame before
+  // the rotation starts, or backface-visibility fails to hide the front
+  // face — the flip then renders as a flat, mirrored front face instead of
+  // swapping in the back. Two rAFs guarantee that paint has happened.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (generation !== flipGeneration) return
+      flipped.value = next
+      // Matches .flip-inner's 0.5s transition, plus a small buffer.
+      flipTimer = setTimeout(() => {
+        flipping.value = false
+        flipTimer = null
+      }, 520)
+    })
+  })
 }
 
 watch(
@@ -72,6 +84,7 @@ watch(
     index.value = 0
     flipped.value = false
     flipping.value = false
+    flipGeneration++
     clearFlipTimer()
     actionsShown.value = false
   },
@@ -80,6 +93,7 @@ watch(
 watch(index, () => {
   flipped.value = false
   flipping.value = false
+  flipGeneration++
   clearFlipTimer()
   actionsShown.value = false
 })
