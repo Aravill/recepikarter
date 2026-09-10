@@ -318,7 +318,7 @@ async function onDelete() {
   height: 32px;
   border-radius: 8px;
   border: 1px solid var(--rule);
-  background: #fff;
+  background: var(--surface);
   color: var(--surface-ink);
   display: flex;
   align-items: center;

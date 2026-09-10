@@ -123,7 +123,7 @@ function removeStep(i: number) {
   padding: 10px 11px;
   border-radius: 8px;
   border: 1px solid var(--rule);
-  background: #fff;
+  background: var(--surface);
   color: var(--surface-ink);
 }
 
