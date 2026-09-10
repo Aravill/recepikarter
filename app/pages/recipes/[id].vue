@@ -76,8 +76,9 @@ async function onDelete() {
   </div>
 
   <div v-else class="detail-screen">
+    <button class="floating-back" aria-label="Zpět" @click="navigateTo('/')">‹</button>
+
     <div class="detail-preview">
-      <button class="floating-back" aria-label="Zpět" @click="navigateTo('/')">‹</button>
       <div class="preview-tabs">
         <button :class="{ active: side === 'front' }" @click="side = 'front'">Přední strana</button>
         <button :class="{ active: side === 'back' }" @click="side = 'back'">Zadní strana</button>
@@ -341,13 +342,26 @@ async function onDelete() {
     max-width: 900px;
     display: grid;
     grid-template-columns: 1fr 280px;
+    grid-template-rows: auto 1fr;
     align-items: start;
-    gap: 32px;
+    gap: 16px 32px;
     padding: 32px 0 56px;
+  }
+
+  /* Explicit grid-row on every item: without it, grid's default sparse
+     packing would push the sheet (column 1) to row 2, since it comes after
+     the preview (column 2) in DOM order and packing doesn't backfill an
+     earlier column once the placement cursor has moved past it. */
+  .floating-back {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    position: static;
+    justify-self: start;
   }
 
   .detail-preview {
     grid-column: 2;
+    grid-row: 2;
     position: sticky;
     inset: auto;
     top: 32px;
@@ -356,6 +370,7 @@ async function onDelete() {
 
   .sheet {
     grid-column: 1;
+    grid-row: 2;
     position: static;
     height: auto;
     border-radius: 14px;
