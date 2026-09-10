@@ -22,7 +22,6 @@ async function onLogout() {
       </NuxtLink>
       <div class="header-actions">
         <button class="logout-btn" @click="onLogout">Odhlásit</button>
-        <NuxtLink to="/recipes/new" class="fab" aria-label="Nový recept">+</NuxtLink>
       </div>
     </header>
     <main class="app-main">
@@ -103,20 +102,6 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.fab {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fdf9f2;
-  text-decoration: none;
-  font-size: 18px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .logout-btn {
