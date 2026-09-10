@@ -1,0 +1,16 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Deploy latest main
+        run: |
+          cd /opt/recepikarter
+          git fetch origin main
+          git reset --hard origin/main
+          docker compose up -d --build
+          docker image prune -f
