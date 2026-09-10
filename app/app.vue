@@ -79,7 +79,7 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
-  background: var(--bg-raised);
+  background: var(--bg-raised) url('/header-bg.png') center / cover no-repeat;
   border-bottom: 1px solid var(--line);
 }
 

@@ -130,7 +130,9 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 
 ## Pages
 
-1. **Login** — username + password, nothing else. No self-registration.
+1. **Login** — username + password, nothing else. No self-registration. The
+   brand banner (`public/banner.png`) sits above the form in place of a plain
+   text wordmark.
 2. **List** — search (fuzzy), with a 🏷️ category-picker and a 🎚️
    difficulty-picker dropdown side by side next to the search field, plus
    sort (name / time / difficulty / last updated, behind an ↕ icon).
@@ -159,6 +161,12 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   real-markup references for the three app screens. Open directly in a
   browser (mobile viewport recommended).
 - `banner.html` / `banner.png` — the wide brand banner (wordmark + tagline +
-  scattered difficulty-stripe cards), for use outside the app itself (README
-  hero, social preview). Re-render after editing the HTML with a headless
-  browser screenshot at 1200×630, 2x device scale.
+  scattered difficulty-stripe cards). Also served live as `public/banner.png`
+  on the login page — keep both copies in sync when it changes. Re-render
+  after editing the HTML with a headless browser screenshot at 1200×630, 2x
+  device scale.
+- `header-bg.html` — generates `public/header-bg.png`, the subtle scattered
+  difficulty-stripe-card texture behind `.app-header` (no wordmark text baked
+  in — the header already renders its own). Wide and short (2400×200) so
+  `background-size: cover` on the header crops it gracefully at any viewport
+  width. Re-render the same way as the banner.

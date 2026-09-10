@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Recepikarter — Header background</title>
+<style>
+  :root {
+    --bg-raised: #e3dbc8;
+    --surface: #fbf8f2;
+    --line: #d8cfbe;
+    --easy: #6f8f5c;
+    --medium: #c98a2e;
+    --hard: #a1423a;
+    --accent: #b8502a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    width: 2400px;
+    height: 200px;
+    background: var(--bg-raised);
+    overflow: hidden;
+    position: relative;
+  }
+  .card {
+    position: absolute;
+    top: 50%;
+    width: 54px;
+    height: 76px;
+    background: var(--surface);
+    border-radius: 9px;
+    overflow: hidden;
+    opacity: 0.4;
+  }
+  .card .stripe { height: 16px; }
+  .card.easy .stripe { background: var(--easy); }
+  .card.medium .stripe { background: var(--medium); }
+  .card.hard .stripe { background: var(--hard); }
+  .card.accent .stripe { background: var(--accent); }
+
+  .p1 { left: 4%;  margin-top: -60px; transform: rotate(-12deg); }
+  .p2 { left: 15%; margin-top: 20px;  transform: rotate(8deg); }
+  .p3 { left: 27%; margin-top: -34px; transform: rotate(-6deg); }
+  .p4 { left: 40%; margin-top: 32px;  transform: rotate(13deg); }
+  .p5 { left: 60%; margin-top: -46px; transform: rotate(9deg); }
+  .p6 { left: 72%; margin-top: 18px;  transform: rotate(-9deg); }
+  .p7 { left: 84%; margin-top: -28px; transform: rotate(6deg); }
+  .p8 { left: 94%; margin-top: 30px;  transform: rotate(-14deg); }
+</style>
+</head>
+<body>
+  <div class="card easy p1"><div class="stripe"></div></div>
+  <div class="card medium p2"><div class="stripe"></div></div>
+  <div class="card accent p3"><div class="stripe"></div></div>
+  <div class="card hard p4"><div class="stripe"></div></div>
+  <div class="card easy p5"><div class="stripe"></div></div>
+  <div class="card medium p6"><div class="stripe"></div></div>
+  <div class="card hard p7"><div class="stripe"></div></div>
+  <div class="card accent p8"><div class="stripe"></div></div>
+</body>
+</html>
