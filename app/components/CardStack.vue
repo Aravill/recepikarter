@@ -29,6 +29,11 @@ const current = computed(() => props.recipes[index.value])
 const canGoPrev = computed(() => index.value > 0)
 const canGoNext = computed(() => index.value < props.recipes.length - 1)
 
+// A sliver of the previous card, peeking out above the top card — mirrors
+// the next-card peek below so the stack reads as "you can go either way",
+// not just forward.
+const prevRecipe = computed(() => (canGoPrev.value ? props.recipes[index.value - 1] : null))
+
 const backgroundLayers = computed(() =>
   [2, 1]
     .map((depth) => ({ depth, recipe: props.recipes[index.value + depth] }))
@@ -168,6 +173,14 @@ function onKeydown(e: KeyboardEvent) {
   <div class="card-stack">
     <div class="stage" tabindex="0" @keydown="onKeydown">
       <div
+        v-if="prevRecipe"
+        class="stack-card stack-card-prev"
+        :style="{ transform: 'translateX(-50%) translateY(-12px) scale(0.95)', zIndex: 9, opacity: 0.85 }"
+      >
+        <RecipeCard :recipe="prevRecipe" side="front" />
+      </div>
+
+      <div
         v-for="layer in backgroundLayers"
         :key="layer.recipe.id"
         class="stack-card"
@@ -248,6 +261,12 @@ function onKeydown(e: KeyboardEvent) {
      out below the top card instead of shrinking toward the same center
      point and canceling the translateY offset out. */
   transform-origin: bottom center;
+}
+
+/* The previous-card peek anchors at the top instead, since it pokes out
+   above the top card (translateY is negative) rather than below it. */
+.stack-card.stack-card-prev {
+  transform-origin: top center;
 }
 
 .stack-card.is-top {
