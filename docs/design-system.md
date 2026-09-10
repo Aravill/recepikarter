@@ -82,8 +82,16 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   actions (Cancel, Print).
 - **Input / select / textarea** — sit on `--surface` panels only (never
   directly on `--bg`); `1px --rule` border, `--accent` focus ring.
-- **Pill** — category filter: outline, neutral. Difficulty filter: filled
-  with the difficulty token at low opacity, dot in the solid color.
+- **Pill** — difficulty filter: filled with the difficulty token at low
+  opacity, dot in the solid color, always all shown. Category filter is a
+  single accent-filled pill that only appears once a category is picked (✕
+  to clear) — the category list itself lives behind the 🏷️ dropdown button
+  next to the search field, not as always-visible pills.
+- **Icon buttons** — this app prefers a pictograph over a text label once the
+  meaning is unambiguous from context: 🏷️ opens the category dropdown, ☰/⊞
+  toggles list/card view, ↕ marks the sort control. Text labels stay for
+  actions that aren't self-evident from a glyph alone (Uložit, Smazat, the
+  category options themselves).
 - **List row** — `--surface` panel, `14px` radius, **4px left border in the
   recipe's difficulty color**, name (Display M) + meta line (Data: category ·
   time · servings), chevron.
@@ -107,11 +115,14 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 ## Pages
 
 1. **Login** — username + password, nothing else. No self-registration.
-2. **List** — search (fuzzy) + category/difficulty filter pills + sort
-   (name / time / difficulty / last updated). Defaults to the card stack
-   (see Components); a "Zobrazit seznam" toggle switches to a traditional
-   row list, and back ("Zobrazit karty"). Changing the search, filter, or
-   sort resets browsing to the first card.
+2. **List** — search (fuzzy), with a 🏷️ category-picker dropdown next to the
+   search field and always-visible difficulty pills, plus sort (name / time
+   / difficulty / last updated, behind an ↕ icon). Defaults to the card
+   stack (see Components); a ☰/⊞ icon button toggles a traditional row list,
+   and back. Changing the search, filter, or sort resets browsing to the
+   first card. Result count reads "Nalezeno: *n*", not a grammatically
+   pluralized "*n* receptů" — simpler, and avoids Czech's three-way plural
+   agreement entirely.
 3. **Detail** — one page for view, edit, *and* create. On mobile, opens
    straight onto the full pre-rendered card preview (front/back tabs) —
    reading a recipe never starts with text boxes. Editing lives in the
