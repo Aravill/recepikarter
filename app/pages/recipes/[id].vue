@@ -3,7 +3,7 @@ import { emptyRecipeInput } from '#shared/types/recipe'
 import type { RecipeInput } from '#shared/types/recipe'
 
 const route = useRoute()
-const { getRecipeById, createRecipe, updateRecipe, deleteRecipe } = useRecipes()
+const { getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported } = useRecipes()
 
 const isNew = computed(() => route.params.id === 'new')
 const recipeId = computed(() => Number(route.params.id))
@@ -15,7 +15,8 @@ const { data: existing, error: fetchError } = await useAsyncData(
 
 const form = ref<RecipeInput>(emptyRecipeInput())
 if (existing.value) {
-  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = existing.value
+  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, lastExportedAt: _lastExportedAt, ...rest } =
+    existing.value
   form.value = rest
 }
 
@@ -23,10 +24,35 @@ const side = ref<'front' | 'back'>('front')
 const sheetExpanded = ref(isNew.value)
 const saving = ref(false)
 const deleting = ref(false)
+const exporting = ref(false)
 const errorMsg = ref('')
+const frontFaceRef = ref<{ $el: HTMLElement } | null>(null)
+const backFaceRef = ref<{ $el: HTMLElement } | null>(null)
 
 function toggleSheet() {
   sheetExpanded.value = !sheetExpanded.value
+}
+
+async function onExportPng() {
+  const frontEl = frontFaceRef.value?.$el
+  const backEl = backFaceRef.value?.$el
+  if (!frontEl || !backEl) return
+  errorMsg.value = ''
+  exporting.value = true
+  try {
+    await exportCardPng(frontEl, backEl, form.value.name)
+    // Only a saved recipe has an id to record against; a new, unsaved one
+    // has nothing in the DB yet to mark.
+    if (!isNew.value) await markExported(recipeId.value)
+  } catch {
+    errorMsg.value = 'Export obrázku se nezdařil.'
+  } finally {
+    exporting.value = false
+  }
+}
+
+function onPrint() {
+  window.print()
 }
 
 async function onSave() {
@@ -43,7 +69,8 @@ async function onSave() {
       await navigateTo(`/recipes/${created.id}`)
     } else {
       const updated = await updateRecipe(recipeId.value, payload)
-      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = updated
+      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, lastExportedAt: _lastExportedAt, ...rest } =
+        updated
       form.value = rest
       sheetExpanded.value = false
     }
@@ -84,7 +111,10 @@ async function onDelete() {
         <button :class="{ active: side === 'back' }" @click="side = 'back'">Zadní strana</button>
       </div>
 
-      <RecipeCard :recipe="form" :side="side" />
+      <div class="flip-inner" :class="{ flipped: side === 'back' }">
+        <RecipeCard ref="frontFaceRef" class="face face-front" :recipe="form" side="front" />
+        <RecipeCard ref="backFaceRef" class="face face-back" :recipe="form" side="back" />
+      </div>
     </div>
 
     <div class="sheet" :class="{ expanded: sheetExpanded }">
@@ -96,8 +126,8 @@ async function onDelete() {
             {{ isNew ? 'Nový recept' : 'Upravit recept' }}
           </span>
           <span class="sheet-quick-actions">
-            <button class="sheet-icon-btn" title="Stáhnout PNG" @click.stop>⬇</button>
-            <button class="sheet-icon-btn" title="Tisk" @click.stop>⎙</button>
+            <button class="sheet-icon-btn" title="Stáhnout PNG" :disabled="exporting" @click.stop="onExportPng">⬇</button>
+            <button class="sheet-icon-btn" title="Tisk" @click.stop="onPrint">⎙</button>
           </span>
         </span>
       </div>
@@ -144,6 +174,29 @@ async function onDelete() {
   align-items: center;
   padding-top: 20px;
   gap: 16px;
+  perspective: 1400px;
+}
+
+.flip-inner {
+  position: relative;
+  width: 240px;
+  height: 502px;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flip-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.face-back {
+  transform: rotateY(180deg);
 }
 
 .floating-back {
@@ -386,5 +439,41 @@ async function onDelete() {
   .sheet-handle-label .chevron {
     display: none;
   }
+}
+
+/* Print just the currently visible card face at true physical size —
+   everything else on the page (nav, tabs, edit sheet) is chrome that
+   doesn't belong on the printed/laminated card. */
+@media print {
+  .floating-back,
+  .preview-tabs,
+  .sheet {
+    display: none;
+  }
+
+  .detail-screen {
+    position: static;
+    min-height: 0;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+
+  .detail-preview {
+    position: static;
+    padding-top: 0;
+  }
+
+  .flip-inner,
+  :deep(.card-preview) {
+    width: 71.8mm;
+    height: 150.5mm;
+    box-shadow: none;
+  }
+}
+
+@page {
+  size: 71.8mm 150.5mm;
+  margin: 0;
 }
 </style>

@@ -10,7 +10,7 @@ const { data: recipes, pending } = await useAsyncData('recipes', () => listRecip
 const search = ref('')
 const selectedCategory = ref<Category | null>(null)
 const selectedDifficulty = ref<Difficulty | null>(null)
-const sortBy = ref<'updated' | 'name' | 'time' | 'difficulty'>('updated')
+const sortBy = ref<'updated' | 'name' | 'time' | 'difficulty' | 'created-desc' | 'created-asc'>('updated')
 const viewMode = ref<'cards' | 'list'>('cards')
 const categoryMenuOpen = ref(false)
 const categoryMenuRef = ref<HTMLElement | null>(null)
@@ -82,6 +82,10 @@ const sorted = computed(() => {
       return list.sort((a, b) => a.cookTime - b.cookTime)
     case 'difficulty':
       return list.sort((a, b) => DIFFICULTY_ORDER[a.cookTimeDifficulty] - DIFFICULTY_ORDER[b.cookTimeDifficulty])
+    case 'created-desc':
+      return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    case 'created-asc':
+      return list.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     case 'updated':
     default:
       return list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -163,6 +167,8 @@ function toggleDifficulty(difficulty: Difficulty) {
             <option value="name">název</option>
             <option value="time">čas přípravy</option>
             <option value="difficulty">obtížnost</option>
+            <option value="created-desc">datum vytvoření (nejnovější)</option>
+            <option value="created-asc">datum vytvoření (nejstarší)</option>
           </select>
         </label>
         <button

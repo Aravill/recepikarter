@@ -51,9 +51,14 @@ export interface Recipe {
   tags: string[]
   createdAt: string
   updatedAt: string
+  // Set server-side when the card's PNG is downloaded (see
+  // POST /api/recipes/:id/export), not user-editable. Lets the UI show
+  // which cards are new since the last print run, and — later — whether a
+  // card has changed since it was last exported.
+  lastExportedAt: string | null
 }
 
-export type RecipeInput = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>
+export type RecipeInput = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'lastExportedAt'>
 
 // Accent color (the difficulty stripe) is derived from difficulty, not
 // stored, and not category — see docs/design-system.md. Category stays a

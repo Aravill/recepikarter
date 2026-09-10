@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRecipe, deleteRecipe, getRecipe, listRecipes, updateRecipe } from '../../../server/utils/db'
+import { createRecipe, deleteRecipe, getRecipe, listRecipes, markExported, updateRecipe } from '../../../server/utils/db'
 import type { RecipeInput } from '../../../shared/types/recipe'
 
 function sampleInput(overrides: Partial<RecipeInput> = {}): RecipeInput {
@@ -25,7 +25,22 @@ describe('recipes db', () => {
     const created = createRecipe(sampleInput())
 
     expect(created.id).toBeTypeOf('number')
+    expect(created.lastExportedAt).toBeNull()
     expect(getRecipe(created.id)).toEqual(created)
+  })
+
+  it('records when a recipe was last exported', () => {
+    const created = createRecipe(sampleInput())
+    expect(created.lastExportedAt).toBeNull()
+
+    const exported = markExported(created.id)
+
+    expect(exported?.lastExportedAt).toBeTypeOf('string')
+    expect(getRecipe(created.id)?.lastExportedAt).toBe(exported?.lastExportedAt)
+  })
+
+  it('returns undefined when marking a recipe that does not exist as exported', () => {
+    expect(markExported(999999)).toBeUndefined()
   })
 
   it('lists recipes newest-updated first', () => {
