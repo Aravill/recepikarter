@@ -23,9 +23,21 @@ db.exec(`
     steps TEXT NOT NULL DEFAULT '[]',
     tags TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    last_exported_at TEXT
   )
 `)
+
+// No migration system (see CLAUDE.md) — this is the first schema change
+// since the initial table, so an existing database on disk predates the
+// last_exported_at column. CREATE TABLE IF NOT EXISTS above only helps a
+// fresh database; this adds the column to one that already exists.
+const hasLastExportedAt = (db.prepare('PRAGMA table_info(recipes)').all() as { name: string }[]).some(
+  (c) => c.name === 'last_exported_at',
+)
+if (!hasLastExportedAt) {
+  db.exec('ALTER TABLE recipes ADD COLUMN last_exported_at TEXT')
+}
 
 interface RecipeRow {
   id: number
@@ -39,6 +51,7 @@ interface RecipeRow {
   tags: string
   created_at: string
   updated_at: string
+  last_exported_at: string | null
 }
 
 function rowToRecipe(row: RecipeRow): Recipe {
@@ -54,6 +67,7 @@ function rowToRecipe(row: RecipeRow): Recipe {
     tags: JSON.parse(row.tags),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    lastExportedAt: row.last_exported_at,
   }
 }
 
@@ -115,4 +129,10 @@ export function updateRecipe(id: number, input: RecipeInput): Recipe | undefined
 export function deleteRecipe(id: number): boolean {
   const result = db.prepare('DELETE FROM recipes WHERE id = ?').run(id)
   return result.changes > 0
+}
+
+export function markExported(id: number): Recipe | undefined {
+  const now = new Date().toISOString()
+  db.prepare('UPDATE recipes SET last_exported_at = ? WHERE id = ?').run(now, id)
+  return getRecipe(id)
 }

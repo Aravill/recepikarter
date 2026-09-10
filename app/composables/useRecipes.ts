@@ -13,6 +13,7 @@ export function useRecipes() {
   const updateRecipe = (id: number, input: RecipeInput) =>
     $fetch<Recipe>(`/api/recipes/${id}`, { method: 'PUT', body: input, headers })
   const deleteRecipe = (id: number) => $fetch(`/api/recipes/${id}`, { method: 'DELETE', headers })
+  const markExported = (id: number) => $fetch<Recipe>(`/api/recipes/${id}/export`, { method: 'POST', headers })
 
-  return { listRecipes, getRecipeById, createRecipe, updateRecipe, deleteRecipe }
+  return { listRecipes, getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported }
 }

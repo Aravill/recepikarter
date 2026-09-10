@@ -3,7 +3,7 @@ import { emptyRecipeInput } from '#shared/types/recipe'
 import type { RecipeInput } from '#shared/types/recipe'
 
 const route = useRoute()
-const { getRecipeById, createRecipe, updateRecipe, deleteRecipe } = useRecipes()
+const { getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported } = useRecipes()
 
 const isNew = computed(() => route.params.id === 'new')
 const recipeId = computed(() => Number(route.params.id))
@@ -15,7 +15,8 @@ const { data: existing, error: fetchError } = await useAsyncData(
 
 const form = ref<RecipeInput>(emptyRecipeInput())
 if (existing.value) {
-  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = existing.value
+  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, lastExportedAt: _lastExportedAt, ...rest } =
+    existing.value
   form.value = rest
 }
 
@@ -60,6 +61,9 @@ async function onExportPng() {
     link.href = dataUrl
     link.download = `${slugify(form.value.name)}-${side.value === 'front' ? 'predni' : 'zadni'}.png`
     link.click()
+    // Only a saved recipe has an id to record against; a new, unsaved one
+    // has nothing in the DB yet to mark.
+    if (!isNew.value) await markExported(recipeId.value)
   } catch {
     errorMsg.value = 'Export obrázku se nezdařil.'
   } finally {
@@ -85,7 +89,8 @@ async function onSave() {
       await navigateTo(`/recipes/${created.id}`)
     } else {
       const updated = await updateRecipe(recipeId.value, payload)
-      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = updated
+      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, lastExportedAt: _lastExportedAt, ...rest } =
+        updated
       form.value = rest
       sheetExpanded.value = false
     }
