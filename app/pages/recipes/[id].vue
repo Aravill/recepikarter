@@ -21,6 +21,12 @@ if (existing.value) {
 }
 
 const side = ref<'front' | 'back'>('front')
+// True only for the duration of the flip's CSS transition — see the
+// `.flipping` rules below. Keeps the 3D rendering context (perspective +
+// preserve-3d) off the preview the rest of the time, which is when a
+// browser is most likely to leave its GPU layer rasterized at a lower
+// resolution than a plain, non-3D element.
+const flipping = ref(false)
 const sheetExpanded = ref(isNew.value)
 const saving = ref(false)
 const deleting = ref(false)
@@ -29,8 +35,22 @@ const errorMsg = ref('')
 const frontFaceRef = ref<{ $el: HTMLElement } | null>(null)
 const backFaceRef = ref<{ $el: HTMLElement } | null>(null)
 
+let flipTimer: ReturnType<typeof setTimeout> | null = null
+
 function toggleSheet() {
   sheetExpanded.value = !sheetExpanded.value
+}
+
+function setSide(next: 'front' | 'back') {
+  if (side.value === next) return
+  side.value = next
+  flipping.value = true
+  if (flipTimer !== null) clearTimeout(flipTimer)
+  // Matches .flip-inner's 0.5s transition, plus a small buffer.
+  flipTimer = setTimeout(() => {
+    flipping.value = false
+    flipTimer = null
+  }, 520)
 }
 
 async function onExportPng() {
@@ -109,13 +129,13 @@ async function onDelete() {
   <div v-else class="detail-screen">
     <button class="floating-back" aria-label="Zpět" @click="navigateTo('/')">‹</button>
 
-    <div class="detail-preview">
+    <div class="detail-preview" :class="{ flipping }">
       <div class="preview-tabs">
-        <button :class="{ active: side === 'front' }" @click="side = 'front'">Přední strana</button>
-        <button :class="{ active: side === 'back' }" @click="side = 'back'">Zadní strana</button>
+        <button :class="{ active: side === 'front' }" @click="setSide('front')">Přední strana</button>
+        <button :class="{ active: side === 'back' }" @click="setSide('back')">Zadní strana</button>
       </div>
 
-      <div class="flip-inner" :class="{ flipped: side === 'back' }">
+      <div class="flip-inner" :class="{ flipped: side === 'back', flipping }">
         <RecipeCard ref="frontFaceRef" class="face face-front" :recipe="form" side="front" />
         <RecipeCard ref="backFaceRef" class="face face-back" :recipe="form" side="back" />
       </div>
@@ -179,6 +199,13 @@ async function onDelete() {
   align-items: center;
   padding-top: 20px;
   gap: 16px;
+}
+
+/* perspective only while the flip is actually animating (see `flipping` in
+   the component) — kept off at rest so the preview renders in a flat,
+   non-3D-composited context instead of one a browser might rasterize at a
+   lower resolution. */
+.detail-preview.flipping {
   perspective: 1400px;
 }
 
@@ -186,8 +213,16 @@ async function onDelete() {
   position: relative;
   width: 240px;
   height: 502px;
-  transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* transform-style: preserve-3d is what lets the front/back faces combine
+   correctly with the parent's rotation into an actual 3D turn — needed only
+   during the animation. At rest (0deg or 180deg, no perspective either) the
+   flattened result is mathematically identical, so dropping it back to flat
+   afterwards is visually seamless. */
+.flip-inner.flipping {
+  transform-style: preserve-3d;
 }
 
 .flip-inner.flipped {
