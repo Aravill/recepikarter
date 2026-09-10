@@ -4,8 +4,8 @@ import { czechStemLight } from '#shared/utils/czech-stem'
 import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { Category, Difficulty, Recipe } from '#shared/types/recipe'
 
-const { listRecipes } = useRecipes()
-const { data: recipes, pending } = await useAsyncData('recipes', () => listRecipes())
+const { listRecipes, importRecipes } = useRecipes()
+const { data: recipes, pending, refresh } = await useAsyncData('recipes', () => listRecipes())
 
 const search = ref('')
 const selectedCategory = ref<Category | null>(null)
@@ -16,6 +16,9 @@ const categoryMenuOpen = ref(false)
 const categoryMenuRef = ref<HTMLElement | null>(null)
 const difficultyMenuOpen = ref(false)
 const difficultyMenuRef = ref<HTMLElement | null>(null)
+const importInputRef = ref<HTMLInputElement | null>(null)
+const importing = ref(false)
+const importMsg = ref('')
 
 function onDocumentClick(e: MouseEvent) {
   const target = e.target as Node
@@ -106,6 +109,36 @@ function selectCategory(category: Category | null) {
 function selectDifficulty(difficulty: Difficulty | null) {
   selectedDifficulty.value = difficulty === selectedDifficulty.value ? null : difficulty
   difficultyMenuOpen.value = false
+}
+
+function triggerImport() {
+  importMsg.value = ''
+  importInputRef.value?.click()
+}
+
+async function onImportFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  // Reset so picking the same file again still fires a change event.
+  input.value = ''
+  if (!file) return
+
+  importing.value = true
+  importMsg.value = ''
+  try {
+    const parsed = JSON.parse(await file.text())
+    const result = await importRecipes(Array.isArray(parsed) ? parsed : [parsed])
+    await refresh()
+    const parts: string[] = []
+    if (result.created.length) parts.push(`Naimportováno: ${result.created.length}`)
+    if (result.skipped.length) parts.push(`Přeskočeno: ${result.skipped.map((s) => s.name).join(', ')}`)
+    importMsg.value = parts.join(' · ')
+  } catch (err) {
+    const error = err as { data?: { statusMessage?: string } }
+    importMsg.value = error?.data?.statusMessage || 'Import se nezdařil, soubor není platný JSON recept.'
+  } finally {
+    importing.value = false
+  }
 }
 </script>
 
@@ -212,8 +245,26 @@ function selectDifficulty(difficulty: Difficulty | null) {
         >
           {{ viewMode === 'cards' ? '☰' : '⊞' }}
         </button>
+        <button
+          type="button"
+          class="view-toggle"
+          aria-label="Nahrát recept z JSON"
+          :disabled="importing"
+          @click="triggerImport"
+        >
+          ⬆
+        </button>
+        <input
+          ref="importInputRef"
+          type="file"
+          accept="application/json"
+          hidden
+          @change="onImportFileChange"
+        />
       </div>
     </div>
+
+    <p v-if="importMsg" class="import-msg">{{ importMsg }}</p>
 
     <p v-if="!pending && !(recipes ?? []).length" class="empty">
       Nemáte žádné recepty. <NuxtLink to="/recipes/new">Vytvořte první</NuxtLink>.
@@ -445,6 +496,13 @@ function selectDifficulty(difficulty: Difficulty | null) {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 5px 8px;
+}
+
+.import-msg {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  padding-bottom: 10px;
 }
 
 .empty {

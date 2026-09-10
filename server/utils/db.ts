@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import Database from 'better-sqlite3'
 import type { Recipe, RecipeInput } from '#shared/types/recipe'
+import { normalizeRecipeName } from '#shared/utils/recipe-name'
 
 const dbPath = process.env.RECIPE_DB_PATH || join(process.cwd(), 'data', 'recipes.sqlite')
 
@@ -79,6 +80,15 @@ export function listRecipes(): Recipe[] {
 export function getRecipe(id: number): Recipe | undefined {
   const row = db.prepare('SELECT * FROM recipes WHERE id = ?').get(id) as RecipeRow | undefined
   return row ? rowToRecipe(row) : undefined
+}
+
+// Case/diacritics-insensitive lookup, used to reject duplicate names on
+// import — see shared/utils/recipe-name.ts. Not indexed in SQL: the
+// normalization isn't expressible as a plain column comparison, and this
+// app's recipe count is small enough that scanning every row in JS is fine.
+export function findRecipeByNormalizedName(name: string): Recipe | undefined {
+  const target = normalizeRecipeName(name)
+  return listRecipes().find((r) => normalizeRecipeName(r.name) === target)
 }
 
 export function createRecipe(input: RecipeInput): Recipe {
