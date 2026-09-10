@@ -27,7 +27,7 @@ async function onSubmit() {
 
 <template>
   <div class="login-body">
-    <div class="wordmark">Recepikarter<small>Kartotéka receptů</small></div>
+    <img src="/banner.png" alt="Recepikarter — Kartotéka receptů" class="banner" />
     <form class="login-panel" @submit.prevent="onSubmit">
       <div class="field">
         <label for="u">Uživatelské jméno</label>
@@ -57,23 +57,12 @@ async function onSubmit() {
   padding: 24px;
 }
 
-.wordmark {
-  font-family: 'Fraunces', Georgia, serif;
-  font-weight: 600;
-  font-size: 26px;
-  color: var(--text);
-  text-align: center;
-}
-
-.wordmark small {
+.banner {
   display: block;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin-top: 7px;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  border-radius: 14px;
 }
 
 .login-panel {

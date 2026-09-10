@@ -87,6 +87,13 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   a category or difficulty is picked, with a ✕ to clear it. Neither filter's
   full option list is shown as always-visible pills any more — both live
   behind their own dropdown button next to the search field.
+- **App icon** — `public/icon.svg`: a rounded card shape (`--surface` fill,
+  `--line` border) with the `--accent` difficulty-stripe motif across the
+  top, no text. Deliberately the same simple mark everywhere (browser tab,
+  home-screen icon, header) rather than a detailed variant for larger sizes
+  — it has to still read at 16px. Rasterized to `favicon.ico` (16/32px) and
+  `apple-touch-icon.png` (180px) at build-adjacent time (`rsvg-convert`) —
+  re-run that if `icon.svg` changes, these aren't generated automatically.
 - **Icon buttons** — this app prefers a pictograph over a text label once the
   meaning is unambiguous from context: 🏷️ opens the category dropdown, 🎚️
   opens the difficulty dropdown, ☰/⊞ toggles list/card view, ↕ marks the sort
@@ -123,7 +130,9 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 
 ## Pages
 
-1. **Login** — username + password, nothing else. No self-registration.
+1. **Login** — username + password, nothing else. No self-registration. The
+   brand banner (`public/banner.png`) sits above the form in place of a plain
+   text wordmark.
 2. **List** — search (fuzzy), with a 🏷️ category-picker and a 🎚️
    difficulty-picker dropdown side by side next to the search field, plus
    sort (name / time / difficulty / last updated, behind an ↕ icon).
@@ -151,3 +160,13 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 - `screen-login.html`, `screen-list.html`, `screen-detail.html` — standalone,
   real-markup references for the three app screens. Open directly in a
   browser (mobile viewport recommended).
+- `banner.html` / `banner.png` — the wide brand banner (wordmark + tagline +
+  scattered difficulty-stripe cards). Also served live as `public/banner.png`
+  on the login page — keep both copies in sync when it changes. Re-render
+  after editing the HTML with a headless browser screenshot at 1200×630, 2x
+  device scale.
+- `header-bg.html` — generates `public/header-bg.png`, the subtle scattered
+  difficulty-stripe-card texture behind `.app-header` (no wordmark text baked
+  in — the header already renders its own). Wide and short (2400×200) so
+  `background-size: cover` on the header crops it gracefully at any viewport
+  width. Re-render the same way as the banner.

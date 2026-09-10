@@ -16,7 +16,10 @@ async function onLogout() {
   <div class="app-shell">
     <NuxtRouteAnnouncer />
     <header v-if="showHeader" class="app-header">
-      <NuxtLink to="/" class="brand">Recepikarter</NuxtLink>
+      <NuxtLink to="/" class="brand">
+        <img src="/icon.svg" alt="" class="brand-icon" width="22" height="22" />
+        Recepikarter
+      </NuxtLink>
       <div class="header-actions">
         <button class="logout-btn" @click="onLogout">Odhlásit</button>
         <NuxtLink to="/recipes/new" class="fab" aria-label="Nový recept">+</NuxtLink>
@@ -76,16 +79,24 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
-  background: var(--bg-raised);
+  background: var(--bg-raised) url('/header-bg.png') center / cover no-repeat;
   border-bottom: 1px solid var(--line);
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: 'Fraunces', Georgia, serif;
   font-size: 19px;
   font-weight: 600;
   text-decoration: none;
   color: var(--text);
+}
+
+.brand-icon {
+  display: block;
+  border-radius: 6px;
 }
 
 .header-actions {
