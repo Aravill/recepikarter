@@ -12,6 +12,12 @@ const LONG_PRESS_MS = 450
 
 const index = ref(0)
 const flipped = ref(false)
+// True only for the duration of the flip's CSS transition — see the
+// `.flipping` rules below. Keeps the 3D rendering context (perspective +
+// preserve-3d) off the top card the rest of the time, which is when a
+// browser is most likely to leave its GPU layer rasterized at a lower
+// resolution than the flat, non-3D background cards.
+const flipping = ref(false)
 const actionsShown = ref(false)
 const dragX = ref(0)
 const dragging = ref(false)
@@ -24,10 +30,16 @@ let pointerId: number | null = null
 let movedPastTapThreshold = false
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let longPressFired = false
+let flipTimer: ReturnType<typeof setTimeout> | null = null
 
 const current = computed(() => props.recipes[index.value])
 const canGoPrev = computed(() => index.value > 0)
 const canGoNext = computed(() => index.value < props.recipes.length - 1)
+
+// A sliver of the previous card, peeking out above the top card — mirrors
+// the next-card peek below so the stack reads as "you can go either way",
+// not just forward.
+const prevRecipe = computed(() => (canGoPrev.value ? props.recipes[index.value - 1] : null))
 
 const backgroundLayers = computed(() =>
   [2, 1]
@@ -36,17 +48,39 @@ const backgroundLayers = computed(() =>
     .reverse(),
 )
 
+function clearFlipTimer() {
+  if (flipTimer !== null) {
+    clearTimeout(flipTimer)
+    flipTimer = null
+  }
+}
+
+function setFlipped(next: boolean) {
+  flipped.value = next
+  flipping.value = true
+  clearFlipTimer()
+  // Matches .flip-inner's 0.5s transition, plus a small buffer.
+  flipTimer = setTimeout(() => {
+    flipping.value = false
+    flipTimer = null
+  }, 520)
+}
+
 watch(
   () => props.recipes,
   () => {
     index.value = 0
     flipped.value = false
+    flipping.value = false
+    clearFlipTimer()
     actionsShown.value = false
   },
 )
 
 watch(index, () => {
   flipped.value = false
+  flipping.value = false
+  clearFlipTimer()
   actionsShown.value = false
 })
 
@@ -65,6 +99,10 @@ async function onExportPng() {
   } finally {
     exporting.value = false
   }
+}
+
+function onExportJson() {
+  if (current.value) exportRecipeJson(current.value)
 }
 
 function onEdit() {
@@ -128,7 +166,7 @@ function onPointerUp(e: PointerEvent) {
     // A tap while the actions are showing dismisses them and reverts to the
     // standard interactions, rather than also flipping the card.
     if (actionsShown.value) actionsShown.value = false
-    else flipped.value = !flipped.value
+    else setFlipped(!flipped.value)
     return
   }
 
@@ -164,6 +202,14 @@ function onKeydown(e: KeyboardEvent) {
   <div class="card-stack">
     <div class="stage" tabindex="0" @keydown="onKeydown">
       <div
+        v-if="prevRecipe"
+        class="stack-card stack-card-prev"
+        :style="{ transform: 'translateX(-50%) translateY(-12px) scale(0.95)', zIndex: 9, opacity: 0.85 }"
+      >
+        <RecipeCard :recipe="prevRecipe" side="front" />
+      </div>
+
+      <div
         v-for="layer in backgroundLayers"
         :key="layer.recipe.id"
         class="stack-card"
@@ -180,14 +226,14 @@ function onKeydown(e: KeyboardEvent) {
         v-if="current"
         :key="current.id"
         class="stack-card is-top"
-        :class="{ dragging }"
+        :class="{ dragging, flipping }"
         :style="{ transform: `translateX(calc(-50% + ${dragX}px)) rotate(${dragX / 18}deg)`, zIndex: 10 }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
         @pointercancel="onPointerUp"
       >
-        <div class="flip-inner" :class="{ flipped }">
+        <div class="flip-inner" :class="{ flipped, flipping }">
           <RecipeCard ref="frontFaceRef" class="face face-front" :recipe="current" side="front" />
           <RecipeCard ref="backFaceRef" class="face face-back" :recipe="current" side="back" />
         </div>
@@ -201,6 +247,7 @@ function onKeydown(e: KeyboardEvent) {
           >
             ⬇
           </button>
+          <button class="card-action-btn" aria-label="Stáhnout JSON" @click.stop="onExportJson">{}</button>
         </div>
       </div>
     </div>
@@ -245,9 +292,21 @@ function onKeydown(e: KeyboardEvent) {
   transform-origin: bottom center;
 }
 
+/* The previous-card peek anchors at the top instead, since it pokes out
+   above the top card (translateY is negative) rather than below it. */
+.stack-card.stack-card-prev {
+  transform-origin: top center;
+}
+
 .stack-card.is-top {
   cursor: grab;
   touch-action: pan-y;
+}
+
+/* perspective only while the flip is actually animating (see `flipping` in
+   the component) — kept off at rest so the top card renders in the same
+   flat, non-3D-composited context as the sharp background cards. */
+.stack-card.is-top.flipping {
   perspective: 1400px;
 }
 
@@ -260,8 +319,16 @@ function onKeydown(e: KeyboardEvent) {
   position: relative;
   width: 100%;
   height: 100%;
-  transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* transform-style: preserve-3d is what lets the front/back faces combine
+   correctly with the parent's rotation into an actual 3D turn — needed only
+   during the animation. At rest (0deg or 180deg, no perspective either) the
+   flattened result is mathematically identical, so dropping it back to flat
+   afterwards is visually seamless. */
+.flip-inner.flipping {
+  transform-style: preserve-3d;
 }
 
 .flip-inner.flipped {

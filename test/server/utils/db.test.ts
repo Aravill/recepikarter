@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRecipe, deleteRecipe, getRecipe, listRecipes, markExported, updateRecipe } from '../../../server/utils/db'
+import {
+  createRecipe,
+  deleteRecipe,
+  findRecipeByNormalizedName,
+  getRecipe,
+  listRecipes,
+  markExported,
+  updateRecipe,
+} from '../../../server/utils/db'
 import type { RecipeInput } from '../../../shared/types/recipe'
 
 function sampleInput(overrides: Partial<RecipeInput> = {}): RecipeInput {
@@ -83,5 +91,17 @@ describe('recipes db', () => {
 
   it('returns false when deleting a recipe that does not exist', () => {
     expect(deleteRecipe(999999)).toBe(false)
+  })
+
+  it('finds a recipe by name regardless of case or diacritics', () => {
+    const created = createRecipe(sampleInput({ name: 'Halušky' }))
+
+    expect(findRecipeByNormalizedName('halusky')?.id).toBe(created.id)
+    expect(findRecipeByNormalizedName('HALUSKY')?.id).toBe(created.id)
+    expect(findRecipeByNormalizedName('Halušky')?.id).toBe(created.id)
+  })
+
+  it('returns undefined when no recipe matches the name', () => {
+    expect(findRecipeByNormalizedName('Nic Takového')).toBeUndefined()
   })
 })

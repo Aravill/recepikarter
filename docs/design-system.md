@@ -97,9 +97,12 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 - **Icon buttons** — this app prefers a pictograph over a text label once the
   meaning is unambiguous from context: 🏷️ opens the category dropdown, 🎚️
   opens the difficulty dropdown, ☰/⊞ toggles list/card view, ↕ marks the sort
-  control, ✎/⬇ edit/export a card from the stack. Text labels stay for
-  actions that aren't self-evident from a glyph alone (Uložit, Smazat, the
-  dropdown options themselves).
+  control, ⬆ uploads a JSON file, ✎/⬇/`{}` edit/export-PNG/export-JSON a card
+  from the stack. The edit/export cluster stays in one plain, monochrome
+  symbol style (no color emoji mixed in) since those three sit side by side
+  and read as one family of actions. Text labels stay for actions that
+  aren't self-evident from a glyph alone (Uložit, Smazat, the dropdown
+  options themselves).
 - **List row** — `--surface` panel, `14px` radius, **4px left border in the
   recipe's difficulty color**, name (Display M) + meta line (Data: category ·
   time · servings), chevron.
@@ -115,10 +118,13 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   bottom, outside the scrollable form area.
 - **Card stack** — the list page's default view. Up to three cards layered
   behind the active one, each further back scaled down and faded slightly —
-  reads like a phone's app-switcher deck. Drag the top card left/right to
-  move to the previous/next match in the current search+filter+sort order
-  (clamped at the ends, no wraparound); a small ‹ *n* / *total* › row below
-  the deck does the same by click, for non-touch input. A tap (no drag) flips
+  reads like a phone's app-switcher deck. A sliver of the *previous* card
+  also peeks out above the top card (smaller offset, more faded) whenever
+  one exists, so the stack reads as reversible instead of implying you can
+  only go further in. Drag the top card left/right to move to the
+  previous/next match in the current search+filter+sort order (clamped at
+  the ends, no wraparound); a small ‹ *n* / *total* › row below the deck
+  does the same by click, for non-touch input. A tap (no drag) flips
   the top card between front/back (3D flip, mirrors the front/back tabs on
   the detail page's preview) — no visible flip button, since the gesture
   itself is the control. Holding the card still (not dragging) instead
