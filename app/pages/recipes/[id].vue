@@ -23,10 +23,52 @@ const side = ref<'front' | 'back'>('front')
 const sheetExpanded = ref(isNew.value)
 const saving = ref(false)
 const deleting = ref(false)
+const exporting = ref(false)
 const errorMsg = ref('')
+const cardRef = ref<{ $el: HTMLElement } | null>(null)
 
 function toggleSheet() {
   sheetExpanded.value = !sheetExpanded.value
+}
+
+function slugify(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug || 'recept'
+}
+
+async function onExportPng() {
+  const el = cardRef.value?.$el
+  if (!el) return
+  errorMsg.value = ''
+  exporting.value = true
+  try {
+    // Loaded on demand: html-to-image touches the DOM/canvas, so it must
+    // never be evaluated during SSR.
+    const { toPng } = await import('html-to-image')
+    // skipFonts: the fonts are Google Fonts loaded cross-origin, so
+    // html-to-image can't read their stylesheet to embed them (a CORS
+    // restriction on CSSOM access) — it logs a caught error and continues
+    // regardless. Skipping the embed attempt avoids that noise; the canvas
+    // still rasterizes with the already-loaded fonts correctly either way.
+    const dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: true, skipFonts: true })
+    const link = document.createElement('a')
+    link.href = dataUrl
+    link.download = `${slugify(form.value.name)}-${side.value === 'front' ? 'predni' : 'zadni'}.png`
+    link.click()
+  } catch {
+    errorMsg.value = 'Export obrázku se nezdařil.'
+  } finally {
+    exporting.value = false
+  }
+}
+
+function onPrint() {
+  window.print()
 }
 
 async function onSave() {
@@ -84,7 +126,7 @@ async function onDelete() {
         <button :class="{ active: side === 'back' }" @click="side = 'back'">Zadní strana</button>
       </div>
 
-      <RecipeCard :recipe="form" :side="side" />
+      <RecipeCard ref="cardRef" :recipe="form" :side="side" />
     </div>
 
     <div class="sheet" :class="{ expanded: sheetExpanded }">
@@ -96,8 +138,8 @@ async function onDelete() {
             {{ isNew ? 'Nový recept' : 'Upravit recept' }}
           </span>
           <span class="sheet-quick-actions">
-            <button class="sheet-icon-btn" title="Stáhnout PNG" @click.stop>⬇</button>
-            <button class="sheet-icon-btn" title="Tisk" @click.stop>⎙</button>
+            <button class="sheet-icon-btn" title="Stáhnout PNG" :disabled="exporting" @click.stop="onExportPng">⬇</button>
+            <button class="sheet-icon-btn" title="Tisk" @click.stop="onPrint">⎙</button>
           </span>
         </span>
       </div>
@@ -386,5 +428,40 @@ async function onDelete() {
   .sheet-handle-label .chevron {
     display: none;
   }
+}
+
+/* Print just the currently visible card face at true physical size —
+   everything else on the page (nav, tabs, edit sheet) is chrome that
+   doesn't belong on the printed/laminated card. */
+@media print {
+  .floating-back,
+  .preview-tabs,
+  .sheet {
+    display: none;
+  }
+
+  .detail-screen {
+    position: static;
+    min-height: 0;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+
+  .detail-preview {
+    position: static;
+    padding-top: 0;
+  }
+
+  :deep(.card-preview) {
+    width: 71.8mm;
+    height: 150.5mm;
+    box-shadow: none;
+  }
+}
+
+@page {
+  size: 71.8mm 150.5mm;
+  margin: 0;
 }
 </style>
