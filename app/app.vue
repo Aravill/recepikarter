@@ -128,6 +128,10 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
+:root[data-theme='dark'] .app-header {
+  background-image: url('/header-bg-dark.png');
+}
+
 .brand {
   display: flex;
   align-items: center;
