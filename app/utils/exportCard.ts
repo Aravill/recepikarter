@@ -39,13 +39,21 @@ export async function exportCardPng(frontEl: HTMLElement, backEl: HTMLElement, r
   const previousTheme = root.getAttribute('data-theme')
   root.setAttribute('data-theme', 'light')
   try {
-    const frontCanvas = await toCanvas(frontEl, opts)
+    // FlipCard hides the front face (`visibility: hidden`) while resting on
+    // the back — see its `rest-back` phase — so it must be forced visible
+    // for its own capture, same as the back face below.
+    const frontCanvas = await toCanvas(frontEl, { ...opts, style: { visibility: 'visible' } })
     // The back face carries its own `transform: rotateY(180deg)` — the
     // flip-card trick that makes it read right-way-round once the shared
     // parent also rotates 180deg on screen. Captured on its own, outside
     // that parent rotation, the raw transform bakes into the raster as a
     // flipped image instead. Override it to `none` for the capture only.
-    const backCanvas = await toCanvas(backEl, { ...opts, style: { transform: 'none' } })
+    // (`visibility` is forced for symmetry with the front face above; the
+    // back face is never actually hidden, but resting-on-the-back also
+    // flattens its own transform to `none` via `.force-flat`, so this keeps
+    // both captures independent of whichever side the card currently rests
+    // on.)
+    const backCanvas = await toCanvas(backEl, { ...opts, style: { transform: 'none', visibility: 'visible' } })
 
     const gap = 72 // px at the 3x pixelRatio above, i.e. a 24 CSS px gap
     const combined = document.createElement('canvas')
