@@ -12,6 +12,7 @@ interface ImportSkip {
 // independently; one invalid or duplicate-named entry doesn't fail the rest
 // of the batch.
 export default defineEventHandler(async (event) => {
+  const { user } = await requireUserSession(event)
   const body = await readBody(event)
   if (!Array.isArray(body) || body.length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'expected a non-empty array of recipes' })
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
     }
 
     seenInBatch.add(key)
-    created.push(createRecipe(input))
+    created.push(createRecipe(input, user.username))
   }
 
   return { created, skipped }
