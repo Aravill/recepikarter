@@ -13,6 +13,9 @@ const props = withDefaults(
 const stripe = computed(() => difficultyColor(props.recipe.cookTimeDifficulty))
 const ingredients = computed(() => props.recipe.ingredients.filter((i) => i.trim()))
 const steps = computed(() => props.recipe.steps.filter((s) => s.trim()))
+// Only a saved Recipe carries an author (server-stamped on create) — a
+// RecipeInput being edited/previewed doesn't have one yet.
+const author = computed(() => ('author' in props.recipe ? props.recipe.author : ''))
 </script>
 
 <template>
@@ -46,6 +49,10 @@ const steps = computed(() => props.recipe.steps.filter((s) => s.trim()))
           <li v-for="(ingredient, i) in ingredients" :key="i">{{ ingredient }}</li>
         </ul>
       </div>
+
+      <div v-if="author" class="mini-footer">
+        <span>Autor: {{ author }}</span>
+      </div>
     </div>
 
     <div v-else class="mini-body">
@@ -54,7 +61,7 @@ const steps = computed(() => props.recipe.steps.filter((s) => s.trim()))
         <li v-for="(step, i) in steps" :key="i">{{ step }}</li>
       </ol>
       <div class="mini-footer">
-        <span>{{ recipe.name || 'Nový recept' }}</span>
+        <span>{{ recipe.name || 'Nový recept' }}{{ author ? ` · ${author}` : '' }}</span>
         <span>2 / 2</span>
       </div>
     </div>
