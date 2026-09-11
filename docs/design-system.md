@@ -122,23 +122,26 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   "Upravit recept" label + quick download/print icons) by default; drag (or
   tap the handle) to expand it over the preview. Save/Delete pinned at its
   bottom, outside the scrollable form area.
-- **Card stack** — the list page's default view. Up to three cards layered
-  behind the active one, each further back scaled down and faded slightly —
-  reads like a phone's app-switcher deck. A sliver of the *previous* card
-  also peeks out above the top card (smaller offset, more faded) whenever
-  one exists, so the stack reads as reversible instead of implying you can
-  only go further in. Drag the top card left/right to move to the
-  previous/next match in the current search+filter+sort order (clamped at
-  the ends, no wraparound); a small ‹ *n* / *total* › row below the deck
-  does the same by click, for non-touch input. A tap (no drag) flips
-  the top card between front/back (3D flip, mirrors the front/back tabs on
+- **Card carousel** — the list page's default view. The active card sits
+  centered in a width-capped stage (desktop looks like phone), with the
+  previous/next cards peeking in from the stage's edges — reads as
+  side-by-side, not a layered deck, and makes clear you can go either way.
+  Wraparound is infinite in both directions through the current
+  search+filter+sort order, even with only one or two matches (their
+  neighbors are then clones of themselves). Drag the active card left/right
+  and release past a threshold to swipe: the card slides fully into the
+  neighbor's slot (nothing flies off-screen); release under the threshold
+  and it springs back. Tapping a visible neighbor also navigates straight to
+  it. A small ‹ *n* / *total* › row below the stage does the same
+  prev/next by click, for non-touch input. A tap (no drag) on the *center*
+  card flips it between front/back (3D flip, mirrors the front/back tabs on
   the detail page's preview) — no visible flip button, since the gesture
-  itself is the control. Holding the card still (not dragging) instead
-  reveals two buttons in its corner — ✎ opens the recipe's detail/edit page,
-  ⬇ exports it — hidden the rest of the time so they don't clutter the card;
-  tapping anywhere while they're shown dismisses them back to the standard
-  tap-to-flip/drag-to-swipe interactions, same gesture on touch and with a
-  mouse alike.
+  itself is the control. Holding the center card still (not dragging)
+  instead reveals two buttons in its corner — ✎ opens the recipe's
+  detail/edit page, ⬇ exports it — hidden the rest of the time so they don't
+  clutter the card; tapping anywhere while they're shown dismisses them back
+  to the standard tap-to-flip/drag-to-swipe interactions, same gesture on
+  touch and with a mouse alike.
 
 ## Pages
 

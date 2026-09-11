@@ -7,15 +7,36 @@ const { markExported } = useRecipes()
 
 const TAP_THRESHOLD = 8
 const SWIPE_THRESHOLD = 90
-const FLY_OUT_DISTANCE = 600
 const LONG_PRESS_MS = 450
+
+// Card width + gap as a single shared source of truth: used both for the
+// stage's CSS custom properties (actual layout) and the slide-distance math
+// below (SLOT). Keeping both derived from the same constants is what keeps
+// the release/reset math in step 5 pixel-exact with the layout — see the
+// plan note this mirrors.
+const CARD_WIDTH = 240
+const CARD_GAP = 16
+const SLOT = CARD_WIDTH + CARD_GAP
+const NEIGHBOR_SCALE = 0.92
+const NEIGHBOR_OPACITY = 0.6
 
 const index = ref(0)
 const side = ref<'front' | 'back'>('front')
 const actionsShown = ref(false)
-const dragX = ref(0)
-const dragging = ref(false)
 const exporting = ref(false)
+// The track's current translateX, in px. Tracks the live drag 1:1 while
+// dragging; animated (via CSS transition) to a target slot offset or back
+// to 0 otherwise.
+const trackX = ref(0)
+const dragging = ref(false)
+// True for the duration of any track-settle animation (slide to a
+// neighbor, or the under-threshold rebound back to 0) — guards against a
+// second gesture starting mid-animation, per the plan's simpler option.
+const sliding = ref(false)
+// Suppresses the track's transition for exactly one frame: the "reset to
+// 0" step after a slide completes, so the window can re-render around the
+// new index without any visible jump (see slideTo).
+const noTrackTransition = ref(false)
 const flipCardRef = ref<{ frontEl: HTMLElement | null; backEl: HTMLElement | null } | null>(null)
 
 let startX = 0
@@ -23,22 +44,28 @@ let pointerId: number | null = null
 let movedPastTapThreshold = false
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let longPressFired = false
+// Which slot (by offset) the current gesture's pointerdown landed on — null
+// when it started on the bare track (e.g. over a ±2 slot, which stays
+// pointer-events: none and lets the event fall through).
+let downOffset: number | null = null
+let trackTransitionDone: (() => void) | null = null
 
+const n = computed(() => props.recipes.length)
 const current = computed(() => props.recipes[index.value])
-const canGoPrev = computed(() => index.value > 0)
-const canGoNext = computed(() => index.value < props.recipes.length - 1)
 
-// A sliver of the previous card, peeking out above the top card — mirrors
-// the next-card peek below so the stack reads as "you can go either way",
-// not just forward.
-const prevRecipe = computed(() => (canGoPrev.value ? props.recipes[index.value - 1] : null))
-
-const backgroundLayers = computed(() =>
-  [2, 1]
-    .map((depth) => ({ depth, recipe: props.recipes[index.value + depth] }))
-    .filter((layer): layer is { depth: number; recipe: Recipe } => !!layer.recipe)
-    .reverse(),
-)
+// A window of 5 slots, offsets -2..+2, each showing the recipe that many
+// steps ahead of/behind the current one, wrapping around the list.
+// Slots are keyed by offset (not recipe id) below — with 1 or 2 recipes
+// the same recipe legitimately appears in several slots at once, including
+// as its own neighbor.
+const slots = computed(() => {
+  const total = n.value
+  if (total === 0) return []
+  return [-2, -1, 0, 1, 2].map((offset) => ({
+    offset,
+    recipe: props.recipes[wrapIndex(index.value + offset, total)],
+  }))
+})
 
 watch(
   () => props.recipes,
@@ -53,6 +80,10 @@ watch(index, () => {
   side.value = 'front'
   actionsShown.value = false
 })
+
+function setFlipCardRef(el: unknown) {
+  flipCardRef.value = el as { frontEl: HTMLElement | null; backEl: HTMLElement | null } | null
+}
 
 async function onExportPng() {
   const frontEl = flipCardRef.value?.frontEl
@@ -86,34 +117,88 @@ function clearLongPressTimer() {
   }
 }
 
+function onTrackTransitionEnd(e: TransitionEvent) {
+  if (e.target !== e.currentTarget || e.propertyName !== 'transform') return
+  const done = trackTransitionDone
+  trackTransitionDone = null
+  done?.()
+}
+
+function animateTrackTo(target: number, onSettled: () => void) {
+  sliding.value = true
+  trackTransitionDone = () => {
+    sliding.value = false
+    onSettled()
+  }
+  trackX.value = target
+}
+
+function slideTo(direction: 1 | -1) {
+  if (sliding.value || n.value === 0) return
+  animateTrackTo(direction === 1 ? -SLOT : SLOT, () => {
+    index.value = wrapIndex(index.value + direction, n.value)
+    // The window re-renders around the new index, so the after-state is
+    // pixel-identical to the before-state at trackX = 0 — reset with the
+    // transition off for one frame so that re-centering isn't itself
+    // animated (which would look like a snap-back).
+    noTrackTransition.value = true
+    trackX.value = 0
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        noTrackTransition.value = false
+      })
+    })
+  })
+}
+
+function goPrev() {
+  slideTo(-1)
+}
+function goNext() {
+  slideTo(1)
+}
+
+function getSlotOffset(target: HTMLElement): number | null {
+  const el = target.closest<HTMLElement>('.card-slot')
+  const raw = el?.dataset.offset
+  return raw !== undefined ? Number(raw) : null
+}
+
 function onPointerDown(e: PointerEvent) {
   if ((e.target as HTMLElement).closest('.card-action-btn')) return
+  if (sliding.value) return
   dragging.value = true
   movedPastTapThreshold = false
   longPressFired = false
   startX = e.clientX
   pointerId = e.pointerId
+  downOffset = getSlotOffset(e.target as HTMLElement)
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
-  // Holding still (not dragging) for LONG_PRESS_MS reveals the edit/download
-  // buttons instead of flipping the card.
+  // Holding still (not dragging) on the center card for LONG_PRESS_MS
+  // reveals the edit/download buttons instead of flipping it.
   clearLongPressTimer()
-  longPressTimer = setTimeout(() => {
-    if (!movedPastTapThreshold) {
-      longPressFired = true
-      actionsShown.value = true
-    }
-  }, LONG_PRESS_MS)
+  if (downOffset === 0) {
+    longPressTimer = setTimeout(() => {
+      if (!movedPastTapThreshold) {
+        longPressFired = true
+        actionsShown.value = true
+      }
+    }, LONG_PRESS_MS)
+  }
 }
 
 function onPointerMove(e: PointerEvent) {
   if (!dragging.value || e.pointerId !== pointerId) return
   if (longPressFired) return
-  dragX.value = e.clientX - startX
-  if (Math.abs(dragX.value) > TAP_THRESHOLD) {
+  const dx = e.clientX - startX
+  if (Math.abs(dx) > TAP_THRESHOLD) {
     movedPastTapThreshold = true
     clearLongPressTimer()
   }
+  // Clamped to +/- SLOT so the user can't drag past the ±1 neighbor into
+  // the ±2 card that's waiting there for the next slide.
+  trackX.value = Math.max(-SLOT, Math.min(SLOT, dx))
 }
 
 function onPointerUp(e: PointerEvent) {
@@ -129,37 +214,31 @@ function onPointerUp(e: PointerEvent) {
     return
   }
 
-  const dx = dragX.value
-
   if (!movedPastTapThreshold) {
-    dragX.value = 0
-    // A tap while the actions are showing dismisses them and reverts to the
-    // standard interactions, rather than also flipping the card.
-    if (actionsShown.value) actionsShown.value = false
-    else side.value = side.value === 'front' ? 'back' : 'front'
+    trackX.value = 0
+    if (downOffset === 0) {
+      // A tap while the actions are showing dismisses them and reverts to
+      // the standard interactions, rather than also flipping the card.
+      if (actionsShown.value) actionsShown.value = false
+      else side.value = side.value === 'front' ? 'back' : 'front'
+    } else if (downOffset === 1 || downOffset === -1) {
+      actionsShown.value = false
+      slideTo(downOffset)
+    }
+    // downOffset null or ±2: a tap on the bare track/an unreachable slot —
+    // nothing to do.
     return
   }
 
   actionsShown.value = false
+  const dx = trackX.value
   const wantsNext = dx < 0
-  const canGo = wantsNext ? canGoNext.value : canGoPrev.value
 
-  if (Math.abs(dx) > SWIPE_THRESHOLD && canGo) {
-    dragX.value = wantsNext ? -FLY_OUT_DISTANCE : FLY_OUT_DISTANCE
-    setTimeout(() => {
-      index.value += wantsNext ? 1 : -1
-      dragX.value = 0
-    }, 220)
+  if (Math.abs(dx) > SWIPE_THRESHOLD) {
+    slideTo(wantsNext ? 1 : -1)
   } else {
-    dragX.value = 0
+    animateTrackTo(0, () => {})
   }
-}
-
-function goPrev() {
-  if (canGoPrev.value) index.value -= 1
-}
-function goNext() {
-  if (canGoNext.value) index.value += 1
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -170,59 +249,58 @@ function onKeydown(e: KeyboardEvent) {
 
 <template>
   <div class="card-stack">
-    <div class="stage" tabindex="0" @keydown="onKeydown">
+    <div
+      class="stage"
+      tabindex="0"
+      :style="{ '--card-width': `${CARD_WIDTH}px`, '--card-gap': `${CARD_GAP}px` }"
+      @keydown="onKeydown"
+    >
       <div
-        v-if="prevRecipe"
-        class="stack-card stack-card-prev"
-        :style="{ transform: 'translateX(-50%) translateY(-12px) scale(0.95)', zIndex: 9, opacity: 0.85 }"
-      >
-        <RecipeCard :recipe="prevRecipe" side="front" />
-      </div>
-
-      <div
-        v-for="layer in backgroundLayers"
-        :key="layer.recipe.id"
-        class="stack-card"
-        :style="{
-          transform: `translateX(-50%) translateY(${layer.depth * 12}px) scale(${1 - layer.depth * 0.05})`,
-          zIndex: 10 - layer.depth,
-          opacity: layer.depth === 2 ? 0.55 : 0.85,
-        }"
-      >
-        <RecipeCard :recipe="layer.recipe" side="front" />
-      </div>
-
-      <div
-        v-if="current"
-        :key="current.id"
-        class="stack-card is-top"
-        :class="{ dragging }"
-        :style="{ transform: `translateX(calc(-50% + ${dragX}px)) rotate(${dragX / 18}deg)`, zIndex: 10 }"
+        v-if="recipes.length"
+        class="track"
+        :class="{ 'no-transition': dragging || noTrackTransition }"
+        :style="{ transform: `translateX(${trackX}px)` }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
         @pointercancel="onPointerUp"
+        @transitionend="onTrackTransitionEnd"
       >
-        <FlipCard ref="flipCardRef" :recipe="current" :side="side" />
-        <div class="card-actions" :class="{ shown: actionsShown }">
-          <button class="card-action-btn" aria-label="Upravit recept" @click.stop="onEdit">✎</button>
-          <button
-            class="card-action-btn"
-            aria-label="Stáhnout PNG"
-            :disabled="exporting"
-            @click.stop="onExportPng"
-          >
-            ⬇
-          </button>
-          <button class="card-action-btn" aria-label="Stáhnout JSON" @click.stop="onExportJson">{}</button>
+        <div
+          v-for="slot in slots"
+          :key="slot.offset"
+          class="card-slot"
+          :class="{ center: slot.offset === 0, far: Math.abs(slot.offset) === 2 }"
+          :data-offset="slot.offset"
+          :style="{
+            transform: `translateX(calc(-50% + ${slot.offset * SLOT}px)) scale(${slot.offset === 0 ? 1 : NEIGHBOR_SCALE})`,
+            opacity: slot.offset === 0 ? 1 : NEIGHBOR_OPACITY,
+            zIndex: 10 - Math.abs(slot.offset),
+          }"
+        >
+          <FlipCard v-if="slot.offset === 0" :ref="setFlipCardRef" :recipe="slot.recipe" :side="side" />
+          <RecipeCard v-else :recipe="slot.recipe" side="front" />
+
+          <div v-if="slot.offset === 0" class="card-actions" :class="{ shown: actionsShown }">
+            <button class="card-action-btn" aria-label="Upravit recept" @click.stop="onEdit">✎</button>
+            <button
+              class="card-action-btn"
+              aria-label="Stáhnout PNG"
+              :disabled="exporting"
+              @click.stop="onExportPng"
+            >
+              ⬇
+            </button>
+            <button class="card-action-btn" aria-label="Stáhnout JSON" @click.stop="onExportJson">{}</button>
+          </div>
         </div>
       </div>
     </div>
 
     <div v-if="recipes.length" class="stack-nav">
-      <button type="button" :disabled="!canGoPrev" aria-label="Předchozí recept" @click="goPrev">‹</button>
+      <button type="button" aria-label="Předchozí recept" @click="goPrev">‹</button>
       <span class="stack-count">{{ index + 1 }} / {{ recipes.length }}</span>
-      <button type="button" :disabled="!canGoNext" aria-label="Další recept" @click="goNext">›</button>
+      <button type="button" aria-label="Další recept" @click="goNext">›</button>
     </div>
   </div>
 </template>
@@ -235,49 +313,52 @@ function onKeydown(e: KeyboardEvent) {
   gap: 18px;
 }
 
+/* Capped width on every screen size — desktop looks like phone, with the
+   neighbors' edges always peeking in at the sides. */
 .stage {
   position: relative;
   width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
   height: 528px;
+  overflow: hidden;
   outline: none;
 }
 
-.stack-card {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  width: 240px;
-  height: 502px;
+.track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: pan-y;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.stack-card:not(.is-top) {
-  pointer-events: none;
-  /* Anchor scaling at the bottom so a smaller, lower card actually peeks
-     out below the top card instead of shrinking toward the same center
-     point and canceling the translateY offset out. */
-  transform-origin: bottom center;
-}
-
-/* The previous-card peek anchors at the top instead, since it pokes out
-   above the top card (translateY is negative) rather than below it. */
-.stack-card.stack-card-prev {
-  transform-origin: top center;
-}
-
-.stack-card.is-top {
-  cursor: grab;
-  touch-action: pan-y;
-}
-
-.stack-card.is-top.dragging {
+.track.no-transition {
   transition: none;
-  cursor: grabbing;
 }
 
-/* Hidden by default on every input type — holding the card (not dragging)
-   reveals them; tapping the card flips it instead of opening the buttons,
-   and tapping anywhere while they're shown dismisses them again. */
+/* Each slot's own transform is static for the life of its DOM node — it's
+   keyed by offset, not recipe id, so a given node's position never
+   changes; only which recipe it displays does. Sliding is entirely the
+   track's own transform animating, not the slots'. */
+.card-slot {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: var(--card-width);
+  height: 502px;
+}
+
+/* ±2 slots exist purely so a card is already in place when the track
+   slides one step further — never a tap target themselves. */
+.card-slot.far {
+  pointer-events: none;
+}
+
+/* Hidden by default on every input type — holding the center card (not
+   dragging) reveals them; tapping the card flips it instead of opening the
+   buttons, and tapping anywhere while they're shown dismisses them again. */
 .card-actions {
   position: absolute;
   top: 10px;
@@ -337,11 +418,6 @@ function onKeydown(e: KeyboardEvent) {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.stack-nav button:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .stack-count {
