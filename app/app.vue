@@ -1,9 +1,13 @@
 <script setup lang="ts">
 const route = useRoute()
-const { loggedIn, clear } = useUserSession()
+const { loggedIn, user, clear } = useUserSession()
 
 const showHeader = computed(
-  () => loggedIn.value && route.path !== '/login' && !route.path.startsWith('/recipes'),
+  () =>
+    loggedIn.value &&
+    route.path !== '/login' &&
+    route.path !== '/change-password' &&
+    !route.path.startsWith('/recipes'),
 )
 
 async function onLogout() {
@@ -40,6 +44,9 @@ function dismissDarkModeToast() {
         Recepikarter
       </NuxtLink>
       <div class="header-actions">
+        <NuxtLink v-if="user?.role === 'admin'" to="/admin/users" class="admin-link" title="Správa uživatelů">
+          Uživatelé
+        </NuxtLink>
         <ThemeToggle @activated-dark="onActivatedDark" />
         <button class="logout-btn" @click="onLogout">Odhlásit</button>
       </div>
@@ -162,6 +169,22 @@ a {
 }
 
 .logout-btn:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.admin-link {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  text-decoration: none;
+}
+
+.admin-link:hover {
   color: var(--text);
   border-color: var(--text-dim);
 }
