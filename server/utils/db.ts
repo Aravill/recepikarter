@@ -115,6 +115,32 @@ export function findRecipeByNormalizedName(name: string): Recipe | undefined {
   return listRecipes().find((r) => normalizeRecipeName(r.name) === target)
 }
 
+// Every distinct tag in use, most-used first, for the tag suggestions in
+// the recipe form. Spellings that differ only by case/diacritics are
+// merged (same normalization as findRecipeByNormalizedName), keeping the
+// most common spelling. Scans all rows in JS for the same reason as above.
+export function listTags(): string[] {
+  const spellings = new Map<string, Map<string, number>>()
+  const rows = db.prepare('SELECT tags FROM recipes').all() as Pick<RecipeRow, 'tags'>[]
+  for (const row of rows) {
+    for (const tag of JSON.parse(row.tags) as string[]) {
+      const key = normalizeRecipeName(tag)
+      const counts = spellings.get(key) ?? new Map<string, number>()
+      counts.set(tag, (counts.get(tag) ?? 0) + 1)
+      spellings.set(key, counts)
+    }
+  }
+  const mostCommon = (counts: Map<string, number>) => [...counts.entries()].sort((a, b) => b[1] - a[1])[0]!
+  return [...spellings.values()]
+    .map((counts) => {
+      const [spelling] = mostCommon(counts)
+      const total = [...counts.values()].reduce((sum, n) => sum + n, 0)
+      return { spelling, total }
+    })
+    .sort((a, b) => b.total - a.total || a.spelling.localeCompare(b.spelling, 'cs'))
+    .map((t) => t.spelling)
+}
+
 export function createRecipe(input: RecipeInput, author: string): Recipe {
   const now = new Date().toISOString()
   const stmt = db.prepare(`

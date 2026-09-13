@@ -7,6 +7,7 @@ import {
   findUserRowByUsername,
   getRecipe,
   listRecipes,
+  listTags,
   listUsers,
   markExported,
   setUserPassword,
@@ -55,6 +56,19 @@ describe('recipes db', () => {
 
   it('returns undefined when marking a recipe that does not exist as exported', () => {
     expect(markExported(999999)).toBeUndefined()
+  })
+
+  it('lists distinct tags most-used first, merging case/diacritic variants', () => {
+    createRecipe(sampleInput({ tags: ['svátek', 'rychlovka'] }), 'michal')
+    createRecipe(sampleInput({ tags: ['Svatek', 'zdravé'] }), 'michal')
+    createRecipe(sampleInput({ tags: ['svátek'] }), 'michal')
+    createRecipe(sampleInput({ tags: [] }), 'michal')
+
+    expect(listTags()).toEqual(['svátek', 'rychlovka', 'zdravé'])
+  })
+
+  it('lists no tags when there are no recipes', () => {
+    expect(listTags()).toEqual([])
   })
 
   it('lists recipes newest-updated first', () => {
