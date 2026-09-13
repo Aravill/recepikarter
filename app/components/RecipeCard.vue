@@ -44,7 +44,7 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
         </div>
       </div>
 
-      <div v-if="ingredients.length">
+      <div v-if="ingredients.length" class="mini-ingredients">
         <p class="mini-section">SUROVINY</p>
         <ul class="mini-list">
           <li v-for="(ingredient, i) in ingredients" :key="i">{{ ingredient }}</li>
@@ -52,7 +52,7 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
       </div>
 
       <ul v-if="tags.length" class="mini-tags" aria-label="Tagy">
-        <li v-for="tag in tags" :key="tag">{{ tag }}</li>
+        <li v-for="(tag, i) in tags" :key="i">{{ tag }}</li>
       </ul>
 
       <div v-if="author" class="mini-footer">
@@ -156,6 +156,16 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
   color: var(--accent);
 }
 
+/* Flex items default to min-height: auto, which would let a long
+   ingredient list grow past the fixed card height and push the tags and
+   author footer out of view; min-height: 0 on both the wrapper and the
+   list is what lets the list actually shrink and scroll instead. */
+.mini-ingredients {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .mini-list {
   list-style: none;
   margin: 5px 0 0;
@@ -163,6 +173,7 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -222,7 +233,7 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
 }
 
 /* Tags sit at the bottom of the front, just above the author line —
-   the ingredient list above them may scroll, this row never does. */
+   the ingredient list above them scrolls, this row never does. */
 .mini-tags {
   list-style: none;
   margin: auto 0 0;
@@ -241,6 +252,8 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
   border-radius: 999px;
   border: 1px solid var(--rule);
   color: var(--surface-ink-dim);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .mini-tags + .mini-footer {
