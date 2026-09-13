@@ -1,18 +1,72 @@
 <script setup lang="ts">
 import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { RecipeInput } from '#shared/types/recipe'
+import { normalizeRecipeName } from '#shared/utils/recipe-name'
 
 const model = defineModel<RecipeInput>({ required: true })
 
-const tagsText = computed({
-  get: () => model.value.tags.join(', '),
-  set: (val: string) => {
-    model.value.tags = val
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean)
-  },
+const { listTags } = useRecipes()
+// Suggestions only matter once someone is typing, so no need to block SSR
+// on them.
+const { data: existingTags } = useAsyncData('recipe-tags', () => listTags(), { lazy: true, default: () => [] })
+
+function parseTags(text: string): string[] {
+  return text
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+}
+
+// The input holds its own text rather than a computed over model.tags:
+// while typing "svátek, " the model can only hold ['svátek'], and echoing
+// that back would eat the separator mid-keystroke. The two watchers keep
+// the text and model.tags in sync in both directions (model changes come
+// from the restored draft and from picking a suggestion).
+const tagsText = ref(model.value.tags.join(', '))
+const tagsFocused = ref(false)
+
+watch(tagsText, (text) => {
+  model.value.tags = parseTags(text)
 })
+watch(
+  () => model.value.tags,
+  (tags) => {
+    if (parseTags(tagsText.value).join(',') !== tags.join(',')) tagsText.value = tags.join(', ')
+  },
+)
+
+const SUGGESTION_LIMIT = 8
+
+// Existing tags matching whatever is typed after the last comma, minus
+// the ones already entered. With nothing typed yet, the most-used ones.
+const tagSuggestions = computed(() => {
+  const segments = tagsText.value.split(',').map(normalizeRecipeName)
+  let fragment = segments.pop() ?? ''
+  // A last segment that already is an existing tag counts as entered, not
+  // as being typed — so focusing a filled-in field still whispers the rest.
+  if (existingTags.value.some((tag) => normalizeRecipeName(tag) === fragment)) {
+    segments.push(fragment)
+    fragment = ''
+  }
+  const chosen = new Set(segments)
+  return existingTags.value
+    .filter((tag) => {
+      const key = normalizeRecipeName(tag)
+      return !chosen.has(key) && key.includes(fragment)
+    })
+    .slice(0, SUGGESTION_LIMIT)
+})
+
+function pickTag(tag: string) {
+  const segments = tagsText.value.split(',').slice(0, -1)
+  // Trailing separator so the next tag can be typed straight away.
+  tagsText.value = [...parseTags(segments.join(',')), tag].join(', ') + ', '
+}
+
+function onTagsBlur() {
+  tagsFocused.value = false
+  tagsText.value = model.value.tags.join(', ')
+}
 
 function addIngredient() {
   model.value.ingredients.push('')
@@ -83,7 +137,29 @@ function removeStep(i: number) {
     <span class="section-heading">Tagy</span>
     <div class="field">
       <label for="f-tags">Oddělené čárkou</label>
-      <input id="f-tags" v-model="tagsText" type="text" placeholder="svátek, rychlovka, vegetariánské" />
+      <input
+        id="f-tags"
+        v-model="tagsText"
+        type="text"
+        placeholder="svátek, rychlovka, vegetariánské"
+        autocomplete="off"
+        @focus="tagsFocused = true"
+        @blur="onTagsBlur"
+      />
+    </div>
+    <!-- mousedown.prevent keeps focus in the input so the chips don't
+         vanish on blur before the click lands -->
+    <div v-if="tagsFocused && tagSuggestions.length" class="tag-suggestions" aria-label="Použité tagy">
+      <button
+        v-for="tag in tagSuggestions"
+        :key="tag"
+        type="button"
+        class="tag-chip"
+        @mousedown.prevent
+        @click="pickTag(tag)"
+      >
+        {{ tag }}
+      </button>
     </div>
   </div>
 </template>
@@ -161,6 +237,30 @@ function removeStep(i: number) {
   background: none;
   border: none;
   cursor: pointer;
+}
+
+.tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-chip {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--rule);
+  background: none;
+  color: var(--surface-ink-dim);
+  cursor: pointer;
+}
+
+.tag-chip:hover,
+.tag-chip:focus-visible {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .add-link {
