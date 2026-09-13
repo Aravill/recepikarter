@@ -175,8 +175,12 @@ async function onSave() {
       }
       // The form stays live (and the draft watcher armed) while the
       // checkmark shows, so clear the draft right before leaving, not now.
+      // The page component is reused across /recipes/new → /recipes/:id,
+      // so the pending photo has to be dropped too or it would upload
+      // again on the next save.
       showSaved(() => {
         clearDraft()
+        resetPhotoState()
         return navigateTo(`/recipes/${created.id}`)
       })
     } else {
