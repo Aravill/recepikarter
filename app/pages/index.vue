@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import Fuse from 'fuse.js'
 import { czechStemLight } from '#shared/utils/czech-stem'
+import { SEARCH_KEY_LABELS, parseSearchQuery } from '#shared/utils/search-query'
+import type { SearchKey } from '#shared/utils/search-query'
 import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { Category, Difficulty, Recipe } from '#shared/types/recipe'
 
@@ -45,39 +47,59 @@ onUnmounted(() => document.removeEventListener('click', onDocumentClick))
 // so plain substring/fuzzy matching on raw text misses most real searches.
 // Stemming each word first (before stripping diacritics — the stemmer's
 // suffix rules rely on them) collapses those forms to a shared stem, applied
-// identically to both indexed text and the live query below.
-function normalize(s: string) {
-  const stemmed = s
+// identically to both indexed text and the live query below. Usernames
+// aren't Czech words, so the author field skips the stemmer.
+function normalize(s: string, { stem = true } = {}) {
+  const words = s
     .toLowerCase()
     .split(/[\s,;.()]+/)
     .filter(Boolean)
-    .map((word) => czechStemLight(word))
+    .map((word) => (stem ? czechStemLight(word) : word))
     .join(' ')
-  return stemmed.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return words.normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
 interface SearchableRecipe extends Recipe {
   _searchName: string
   _searchIngredients: string[]
+  _searchTags: string[]
+  _searchAuthor: string
+}
+
+// Which Fuse key a "key:" prefix restricts the search to (see
+// shared/utils/search-query.ts); no prefix searches all of them.
+const SEARCH_FIELDS: Record<SearchKey, keyof SearchableRecipe> = {
+  name: '_searchName',
+  ingredient: '_searchIngredients',
+  tag: '_searchTags',
+  author: '_searchAuthor',
 }
 
 const fuse = computed(() => {
   const list: SearchableRecipe[] = (recipes.value ?? []).map((r) => ({
     ...r,
     _searchName: normalize(r.name),
-    _searchIngredients: r.ingredients.map(normalize),
+    _searchIngredients: r.ingredients.map((i) => normalize(i)),
+    _searchTags: r.tags.map((t) => normalize(t)),
+    _searchAuthor: normalize(r.author, { stem: false }),
   }))
   return new Fuse(list, {
-    keys: ['_searchName', '_searchIngredients'],
+    keys: Object.values(SEARCH_FIELDS),
     threshold: 0.35,
     ignoreLocation: true,
   })
 })
 
+const parsedSearch = computed(() => parseSearchQuery(search.value))
+const searchKey = computed(() => parsedSearch.value.key)
+
 const searched = computed<Recipe[]>(() => {
-  const q = normalize(search.value.trim())
+  const { key, term } = parsedSearch.value
+  const q = normalize(term, { stem: key !== 'author' })
   if (!q) return recipes.value ?? []
-  return fuse.value.search(q).map((r) => r.item)
+  // Fuse's object-form query restricts matching to a single key.
+  const query = key ? { [SEARCH_FIELDS[key]]: q } : q
+  return fuse.value.search(query).map((r) => r.item)
 })
 
 const filtered = computed(() =>
@@ -154,7 +176,15 @@ async function onImportFileChange(e: Event) {
   <div class="list-page">
     <div class="search-wrap">
       <div class="search-row">
-        <input v-model="search" class="search-input" type="search" placeholder="Hledat recept nebo ingredienci…" />
+        <div class="search-field" :class="{ keyed: !!searchKey }">
+          <input
+            v-model="search"
+            class="search-input"
+            type="search"
+            placeholder="Hledat… nebo autor:, štítek:, ingredience:"
+          />
+          <span v-if="searchKey" class="search-key" aria-live="polite">{{ SEARCH_KEY_LABELS[searchKey] }}</span>
+        </div>
         <div ref="categoryMenuRef" class="filter-menu">
           <button
             type="button"
@@ -344,6 +374,13 @@ async function onImportFileChange(e: Event) {
   gap: 8px;
 }
 
+.search-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
 .search-input {
   flex: 1;
   min-width: 0;
@@ -353,6 +390,41 @@ async function onImportFileChange(e: Event) {
   border: 1px solid var(--line);
   background: var(--bg-raised);
   color: var(--text);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+/* A recognised "key:" prefix restricts the search to one field — make that
+   state unmistakable: accent border, soft glow, and a chip naming the field
+   so a typo'd key (which silently falls back to plain search) is visible. */
+.search-field.keyed .search-input {
+  padding-right: 96px;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(184, 80, 42, 0.22);
+}
+
+/* The key appears while the user is typing, i.e. focused — the default
+   focus ring would paint over the accent border, so the glow doubles as
+   the focus indicator in this state. */
+.search-field.keyed .search-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(184, 80, 42, 0.38);
+}
+
+.search-key {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font: 600 11px 'IBM Plex Mono', ui-monospace, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fdf9f2;
+  pointer-events: none;
 }
 
 .search-input::placeholder {
