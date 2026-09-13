@@ -6,9 +6,9 @@ import { normalizeRecipeName } from '#shared/utils/recipe-name'
 const model = defineModel<RecipeInput>({ required: true })
 
 const { listTags } = useRecipes()
-// Suggestions only matter once someone is typing, so no need to block SSR
-// on them.
-const { data: existingTags } = useAsyncData('recipe-tags', () => listTags(), { lazy: true, default: () => [] })
+// Suggestions only matter once someone is typing, so they're fetched on
+// the client after hydration rather than as part of the SSR response.
+const { data: existingTags } = useAsyncData('recipe-tags', () => listTags(), { server: false, default: () => [] })
 
 function parseTags(text: string): string[] {
   return text
@@ -37,18 +37,24 @@ watch(
 
 const SUGGESTION_LIMIT = 8
 
-// Existing tags matching whatever is typed after the last comma, minus
-// the ones already entered. With nothing typed yet, the most-used ones.
+// Splits the field into the tags already entered and the fragment still
+// being typed after the last comma. A last segment that already is an
+// existing tag counts as entered, not as being typed — so focusing a
+// filled-in field still whispers the rest, and picking a chip keeps it.
+function splitTyped(text: string) {
+  const segments = text.split(',').map((t) => t.trim())
+  const last = normalizeRecipeName(segments.at(-1) ?? '')
+  const lastIsTag = existingTags.value.some((tag) => normalizeRecipeName(tag) === last)
+  return lastIsTag
+    ? { entered: segments.filter(Boolean), fragment: '' }
+    : { entered: segments.slice(0, -1).filter(Boolean), fragment: last }
+}
+
+// Existing tags matching the typed fragment, minus the ones already
+// entered. With nothing typed yet, the most-used ones.
 const tagSuggestions = computed(() => {
-  const segments = tagsText.value.split(',').map(normalizeRecipeName)
-  let fragment = segments.pop() ?? ''
-  // A last segment that already is an existing tag counts as entered, not
-  // as being typed — so focusing a filled-in field still whispers the rest.
-  if (existingTags.value.some((tag) => normalizeRecipeName(tag) === fragment)) {
-    segments.push(fragment)
-    fragment = ''
-  }
-  const chosen = new Set(segments)
+  const { entered, fragment } = splitTyped(tagsText.value)
+  const chosen = new Set(entered.map(normalizeRecipeName))
   return existingTags.value
     .filter((tag) => {
       const key = normalizeRecipeName(tag)
@@ -58,9 +64,9 @@ const tagSuggestions = computed(() => {
 })
 
 function pickTag(tag: string) {
-  const segments = tagsText.value.split(',').slice(0, -1)
+  const { entered } = splitTyped(tagsText.value)
   // Trailing separator so the next tag can be typed straight away.
-  tagsText.value = [...parseTags(segments.join(',')), tag].join(', ') + ', '
+  tagsText.value = [...entered, tag].join(', ') + ', '
 }
 
 function onTagsBlur() {
