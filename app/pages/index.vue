@@ -271,7 +271,9 @@ async function onImportFileChange(e: Event) {
     </p>
     <p v-else-if="!pending && !sorted.length" class="empty">Žádné recepty neodpovídají hledání ani filtru.</p>
 
-    <CardStack v-else-if="viewMode === 'cards'" :recipes="sorted" />
+    <div v-else-if="viewMode === 'cards'" class="carousel-wrap">
+      <CardStack :recipes="sorted" />
+    </div>
 
     <div v-else class="list">
       <NuxtLink
@@ -305,6 +307,22 @@ async function onImportFileChange(e: Event) {
   flex-direction: column;
   max-width: 640px;
   margin: 0 auto;
+}
+
+/* Desktop: the card carousel shows three full-size cards side by side (see
+   CardStack's stage), which needs more than the single 640px column. Only
+   the carousel gets the extra room — search, filters, the row list and the
+   button stay a centered 640px column. */
+@media (min-width: 900px) {
+  .list-page {
+    max-width: 1000px;
+  }
+
+  .list-page > :not(.carousel-wrap) {
+    width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
+  }
 }
 
 .search-wrap {

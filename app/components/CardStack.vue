@@ -9,14 +9,17 @@ const TAP_THRESHOLD = 8
 const SWIPE_THRESHOLD = 90
 const LONG_PRESS_MS = 450
 
-// Card width + gap as a single shared source of truth: used both for the
-// stage's CSS custom properties (actual layout) and the slide-distance math
-// below (SLOT). Keeping both derived from the same constants is what keeps
-// the release/reset math in step 5 pixel-exact with the layout — see the
-// plan note this mirrors.
+// Card size + gap as a single shared source of truth: exposed to the
+// stylesheet as CSS custom properties on the stage (actual layout) and used
+// for the slide-distance math below. The stage's stylesheet multiplies them
+// by `--card-scale` (1 on phones, larger on desktop — see the media query in
+// <style>), so the JS side reads the *effective* slot width back from the
+// computed style (`slotPx`) instead of assuming the unscaled constant.
+// Keeping layout and math derived from the same values is what keeps the
+// release/reset step pixel-exact — a mismatch shows as a jump after a slide.
 const CARD_WIDTH = 240
+const CARD_HEIGHT = 502
 const CARD_GAP = 16
-const SLOT = CARD_WIDTH + CARD_GAP
 const NEIGHBOR_SCALE = 0.92
 const NEIGHBOR_OPACITY = 0.6
 
@@ -38,6 +41,7 @@ const sliding = ref(false)
 // new index without any visible jump (see slideTo).
 const noTrackTransition = ref(false)
 const flipCardRef = ref<{ frontEl: HTMLElement | null; backEl: HTMLElement | null } | null>(null)
+const stageRef = ref<HTMLElement | null>(null)
 
 let startX = 0
 let pointerId: number | null = null
@@ -49,6 +53,28 @@ let longPressFired = false
 // pointer-events: none and lets the event fall through).
 let downOffset: number | null = null
 let trackTransitionDone: (() => void) | null = null
+// Distance between neighboring slots in screen px, i.e. (width + gap) ×
+// the stage's current `--card-scale`. Only the slots are scaled (not the
+// track), so drag deltas from clientX stay 1:1 with trackX and only the
+// slide target/clamp need this. Read after mount and on resize; gestures
+// can't happen before mount, so the unscaled default never actually
+// drives one.
+let slotPx = CARD_WIDTH + CARD_GAP
+
+function readSlotPx() {
+  if (!stageRef.value) return
+  const scale = parseFloat(getComputedStyle(stageRef.value).getPropertyValue('--card-scale')) || 1
+  slotPx = (CARD_WIDTH + CARD_GAP) * scale
+}
+
+onMounted(() => {
+  readSlotPx()
+  window.addEventListener('resize', readSlotPx)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', readSlotPx)
+})
 
 const n = computed(() => props.recipes.length)
 const current = computed(() => props.recipes[index.value])
@@ -135,7 +161,7 @@ function animateTrackTo(target: number, onSettled: () => void) {
 
 function slideTo(direction: 1 | -1) {
   if (sliding.value || n.value === 0) return
-  animateTrackTo(direction === 1 ? -SLOT : SLOT, () => {
+  animateTrackTo(direction === 1 ? -slotPx : slotPx, () => {
     index.value = wrapIndex(index.value + direction, n.value)
     // The window re-renders around the new index, so the after-state is
     // pixel-identical to the before-state at trackX = 0 — reset with the
@@ -196,9 +222,9 @@ function onPointerMove(e: PointerEvent) {
     movedPastTapThreshold = true
     clearLongPressTimer()
   }
-  // Clamped to +/- SLOT so the user can't drag past the ±1 neighbor into
-  // the ±2 card that's waiting there for the next slide.
-  trackX.value = Math.max(-SLOT, Math.min(SLOT, dx))
+  // Clamped to +/- one slot so the user can't drag past the ±1 neighbor
+  // into the ±2 card that's waiting there for the next slide.
+  trackX.value = Math.max(-slotPx, Math.min(slotPx, dx))
 }
 
 function onPointerUp(e: PointerEvent) {
@@ -217,10 +243,7 @@ function onPointerUp(e: PointerEvent) {
   if (!movedPastTapThreshold) {
     trackX.value = 0
     if (downOffset === 0) {
-      // A tap while the actions are showing dismisses them and reverts to
-      // the standard interactions, rather than also flipping the card.
-      if (actionsShown.value) actionsShown.value = false
-      else side.value = side.value === 'front' ? 'back' : 'front'
+      flipCenter()
     } else if (downOffset === 1 || downOffset === -1) {
       actionsShown.value = false
       slideTo(downOffset)
@@ -241,24 +264,43 @@ function onPointerUp(e: PointerEvent) {
   }
 }
 
+function flipCenter() {
+  // Same rule as a tap on the center card: while the actions are showing,
+  // the gesture dismisses them instead of flipping.
+  if (actionsShown.value) actionsShown.value = false
+  else side.value = side.value === 'front' ? 'back' : 'front'
+}
+
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowLeft') goPrev()
   else if (e.key === 'ArrowRight') goNext()
+  else if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+    // Only when the stage itself is focused — not a button inside it, which
+    // handles Enter/Space on its own.
+    e.preventDefault()
+    if (n.value) flipCenter()
+  }
 }
 </script>
 
 <template>
   <div class="card-stack">
     <div
+      ref="stageRef"
       class="stage"
       tabindex="0"
-      :style="{ '--card-width': `${CARD_WIDTH}px`, '--card-gap': `${CARD_GAP}px` }"
+      :style="{
+        '--card-width': `${CARD_WIDTH}px`,
+        '--card-height': `${CARD_HEIGHT}px`,
+        '--card-gap': `${CARD_GAP}px`,
+        '--neighbor-opacity': NEIGHBOR_OPACITY,
+      }"
       @keydown="onKeydown"
     >
       <div
         v-if="recipes.length"
         class="track"
-        :class="{ 'no-transition': dragging || noTrackTransition }"
+        :class="{ 'no-transition': dragging || noTrackTransition, dragging }"
         :style="{ transform: `translateX(${trackX}px)` }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
@@ -273,8 +315,7 @@ function onKeydown(e: KeyboardEvent) {
           :class="{ center: slot.offset === 0, far: Math.abs(slot.offset) === 2 }"
           :data-offset="slot.offset"
           :style="{
-            transform: `translateX(calc(-50% + ${slot.offset * SLOT}px)) scale(${slot.offset === 0 ? 1 : NEIGHBOR_SCALE})`,
-            opacity: slot.offset === 0 ? 1 : NEIGHBOR_OPACITY,
+            transform: `translateX(calc(-50% + ${slot.offset} * var(--slot))) scale(calc(var(--card-scale) * ${slot.offset === 0 ? 1 : NEIGHBOR_SCALE}))`,
             zIndex: 10 - Math.abs(slot.offset),
           }"
         >
@@ -313,16 +354,34 @@ function onKeydown(e: KeyboardEvent) {
   gap: 18px;
 }
 
-/* Capped width on every screen size — desktop looks like phone, with the
-   neighbors' edges always peeking in at the sides. */
+/* Phone: a capped-width stage with just the neighbors' edges peeking in at
+   the sides. The cards themselves are always laid out at their native
+   240×502 (the printed-card facsimile RecipeCard is built around) and
+   scaled as a whole via `--card-scale` — the desktop media query below
+   raises it; nothing inside the card ever reflows. */
 .stage {
+  --card-scale: 1;
+  --slot: calc((var(--card-width) + var(--card-gap)) * var(--card-scale));
   position: relative;
   width: 100%;
   max-width: 360px;
   margin: 0 auto;
-  height: 528px;
+  /* card height + room for its drop shadow */
+  height: calc(var(--card-height) * var(--card-scale) + 26px);
   overflow: hidden;
   outline: none;
+}
+
+/* Desktop (same breakpoint as the detail page's two-column layout): bigger
+   cards, and a stage exactly wide enough for the center card plus both
+   neighbors in full instead of cropped slivers. The ±2 cards enter/leave
+   through a soft fade at the edges rather than a hard crop. */
+@media (min-width: 900px) {
+  .stage {
+    --card-scale: 1.3;
+    max-width: calc((3 * var(--card-width) + 2 * var(--card-gap)) * var(--card-scale));
+    mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  }
 }
 
 .track {
@@ -331,6 +390,8 @@ function onKeydown(e: KeyboardEvent) {
   height: 100%;
   cursor: grab;
   touch-action: pan-y;
+  /* A mouse drag across the card text would otherwise start a selection. */
+  user-select: none;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -341,13 +402,53 @@ function onKeydown(e: KeyboardEvent) {
 /* Each slot's own transform is static for the life of its DOM node — it's
    keyed by offset, not recipe id, so a given node's position never
    changes; only which recipe it displays does. Sliding is entirely the
-   track's own transform animating, not the slots'. */
+   track's own transform animating, not the slots'.
+   The slot box stays unscaled: `translateX(-50%)` is relative to its native
+   width, and scaling about top-center keeps that horizontal center put, so
+   slot 0 is centered and slot k lands at k × --slot for any scale. */
 .card-slot {
   position: absolute;
   left: 50%;
   top: 0;
   width: var(--card-width);
-  height: 502px;
+  height: var(--card-height);
+  transform-origin: top center;
+  opacity: var(--neighbor-opacity);
+}
+
+.card-slot.center {
+  opacity: 1;
+}
+
+/* Mouse: clicking is the primary action (flip the center card, go to a
+   neighbor), so advertise that instead of dragging — dragging still works,
+   and the cursor switches to grabbing once one actually starts. Hovering
+   the center card reveals the action buttons that touch gets via long
+   press, and neighbors brighten to read as click targets. Gated on a fine
+   pointer so touch devices at desktop widths keep the touch behavior. */
+@media (hover: hover) and (pointer: fine) {
+  .track {
+    cursor: default;
+  }
+
+  .track.dragging {
+    cursor: grabbing;
+  }
+
+  .card-slot:not(.far) {
+    cursor: pointer;
+    transition: opacity 0.18s ease;
+  }
+
+  .card-slot:not(.center, .far):hover {
+    opacity: 0.85;
+  }
+
+  .card-slot.center:hover .card-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(0, 0) scale(1);
+  }
 }
 
 /* ±2 slots exist purely so a card is already in place when the track
