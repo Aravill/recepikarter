@@ -4,6 +4,7 @@ import type { RecipeInput } from '#shared/types/recipe'
 
 const route = useRoute()
 const { getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported } = useRecipes()
+const { loadDraft, saveDraft, clearDraft } = useRecipeDraft()
 
 const isNew = computed(() => route.params.id === 'new')
 const recipeId = computed(() => Number(route.params.id))
@@ -27,6 +28,50 @@ const deleting = ref(false)
 const exporting = ref(false)
 const errorMsg = ref('')
 const flipCardRef = ref<{ frontEl: HTMLElement | null; backEl: HTMLElement | null } | null>(null)
+
+// Autosave the new-recipe form so a closed tab or a stray back click
+// doesn't lose it. Only for new recipes: an edit already has the saved
+// row to fall back on, and a stale edit draft could silently overwrite
+// changes made from another device.
+const draftRestored = ref(false)
+const draftDirty = computed(() => isNew.value && JSON.stringify(form.value) !== JSON.stringify(emptyRecipeInput()))
+let draftToastTimer: ReturnType<typeof setTimeout> | null = null
+
+// The toast sits over the sheet footer on mobile, so it has to go away on
+// its own rather than block the save button until someone dismisses it.
+function dismissDraftToast() {
+  draftRestored.value = false
+  if (draftToastTimer) clearTimeout(draftToastTimer)
+}
+
+onMounted(() => {
+  if (!isNew.value) return
+  const draft = loadDraft()
+  if (draft) {
+    form.value = draft
+    draftRestored.value = true
+    draftToastTimer = setTimeout(dismissDraftToast, 6000)
+  }
+})
+
+onUnmounted(() => {
+  if (draftToastTimer) clearTimeout(draftToastTimer)
+})
+
+watch(
+  form,
+  (value) => {
+    if (isNew.value) saveDraft(value)
+  },
+  { deep: true },
+)
+
+function onDiscardDraft() {
+  if (!confirm('Zahodit rozpracovaný recept?')) return
+  form.value = emptyRecipeInput()
+  clearDraft()
+  dismissDraftToast()
+}
 
 function toggleSheet() {
   sheetExpanded.value = !sheetExpanded.value
@@ -73,6 +118,7 @@ async function onSave() {
     }
     if (isNew.value) {
       const created = await createRecipe(payload)
+      clearDraft()
       await navigateTo(`/recipes/${created.id}`)
     } else {
       const updated = await updateRecipe(recipeId.value, payload)
@@ -144,11 +190,20 @@ async function onDelete() {
 
       <div class="sheet-footer">
         <button v-if="!isNew" class="btn btn-danger" :disabled="deleting" @click="onDelete">🗑</button>
+        <button v-if="draftDirty" class="btn btn-danger" title="Zahodit rozpracovaný recept" @click="onDiscardDraft">
+          ✕
+        </button>
         <button class="btn btn-primary" :disabled="saving" @click="onSave">
           {{ saving ? 'Ukládám…' : 'Uložit' }}
         </button>
       </div>
     </div>
+
+    <InfoToast
+      v-if="draftRestored"
+      message="Obnovili jsme váš rozpracovaný recept. Ukládá se průběžně, dokud ho neuložíte nebo nezahodíte."
+      @dismiss="dismissDraftToast"
+    />
   </div>
 </template>
 
