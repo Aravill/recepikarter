@@ -2,6 +2,7 @@
 import Fuse from 'fuse.js'
 import { czechStemLight } from '#shared/utils/czech-stem'
 import { SEARCH_KEY_LABELS, parseSearchQuery } from '#shared/utils/search-query'
+import { buildImportPrompt } from '#shared/utils/import-prompt'
 import type { SearchKey } from '#shared/utils/search-query'
 import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { Category, Difficulty, Recipe } from '#shared/types/recipe'
@@ -170,6 +171,61 @@ async function onImportFileChange(e: Event) {
     importing.value = false
   }
 }
+
+// Copies the LLM prompt (see shared/utils/import-prompt.ts) so the user can
+// paste it into whatever chat model they use along with a recipe from the
+// web, then bring the resulting JSON back through the ⬆ import button. The
+// toast spells that round trip out, since the button alone can't.
+const promptToast = ref('')
+let promptToastTimer: ReturnType<typeof setTimeout> | null = null
+
+function showPromptToast(message: string) {
+  promptToast.value = message
+  if (promptToastTimer) clearTimeout(promptToastTimer)
+  promptToastTimer = setTimeout(dismissPromptToast, 8000)
+}
+
+function dismissPromptToast() {
+  promptToast.value = ''
+  if (promptToastTimer) clearTimeout(promptToastTimer)
+}
+
+onUnmounted(dismissPromptToast)
+
+// The home server is typically reached over plain http on the LAN, where
+// navigator.clipboard is undefined (secure contexts only) — fall back to
+// the legacy selection-based copy there.
+function copyText(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      () => true,
+      () => false,
+    )
+  }
+  const area = document.createElement('textarea')
+  area.value = text
+  area.setAttribute('readonly', '')
+  area.style.position = 'fixed'
+  area.style.opacity = '0'
+  document.body.appendChild(area)
+  area.select()
+  let ok = false
+  try {
+    ok = document.execCommand('copy')
+  } finally {
+    area.remove()
+  }
+  return Promise.resolve(ok)
+}
+
+async function copyImportPrompt() {
+  const ok = await copyText(buildImportPrompt())
+  showPromptToast(
+    ok
+      ? 'Prompt zkopírován. Vložte ho do ChatGPT, Claude nebo jiné AI, za něj přidejte recept z webu a výsledný JSON nahrajte tlačítkem ⬆.'
+      : 'Kopírování do schránky se nezdařilo. Zkuste to znovu nebo použijte jiný prohlížeč.',
+  )
+}
 </script>
 
 <template>
@@ -335,9 +391,22 @@ async function onImportFileChange(e: Event) {
       </NuxtLink>
     </div>
 
-    <NuxtLink v-if="!pending" to="/recipes/new" class="new-recipe-btn">
-      {{ hasPendingDraft ? '✎ Pokračovat v rozpracovaném receptu' : '+ Nový recept' }}
-    </NuxtLink>
+    <div v-if="!pending" class="actions-row">
+      <NuxtLink to="/recipes/new" class="new-recipe-btn">
+        {{ hasPendingDraft ? '✎ Pokračovat v rozpracovaném receptu' : '+ Nový recept' }}
+      </NuxtLink>
+      <button
+        type="button"
+        class="prompt-btn"
+        aria-label="Zkopírovat prompt pro AI, který převede recept z webu na JSON k nahrání"
+        title="Zkopírovat prompt pro AI"
+        @click="copyImportPrompt"
+      >
+        ✨
+      </button>
+    </div>
+
+    <InfoToast v-if="promptToast" :message="promptToast" @dismiss="dismissPromptToast" />
   </div>
 </template>
 
@@ -659,11 +728,18 @@ async function onImportFileChange(e: Event) {
   flex: none;
 }
 
+.actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
 .new-recipe-btn {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 18px;
   padding: 13px;
   border-radius: 10px;
   background: var(--accent);
@@ -672,5 +748,26 @@ async function onImportFileChange(e: Event) {
   font-family: 'IBM Plex Sans', sans-serif;
   font-weight: 600;
   font-size: 15px;
+}
+
+/* Square companion to the primary button: stretches to its height (13px
+   padding + one 15px line ≈ 45px), so the width is pinned to match. */
+.prompt-btn {
+  flex: none;
+  width: 45px;
+  font-size: 18px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prompt-btn:hover {
+  border-color: var(--accent);
 }
 </style>
