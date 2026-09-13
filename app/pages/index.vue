@@ -2,7 +2,8 @@
 import Fuse from 'fuse.js'
 import { czechStemLight } from '#shared/utils/czech-stem'
 import { SEARCH_KEY_LABELS, parseSearchQuery } from '#shared/utils/search-query'
-import { buildImportPrompt } from '#shared/utils/import-prompt'
+import { PROMPT_LANGS, PROMPT_LANG_LABELS, buildImportPrompt } from '#shared/utils/import-prompt'
+import type { PromptLang } from '#shared/utils/import-prompt'
 import type { SearchKey } from '#shared/utils/search-query'
 import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { Category, Difficulty, Recipe } from '#shared/types/recipe'
@@ -21,6 +22,8 @@ const categoryMenuRef = ref<HTMLElement | null>(null)
 const difficultyMenuOpen = ref(false)
 const difficultyMenuRef = ref<HTMLElement | null>(null)
 const importInputRef = ref<HTMLInputElement | null>(null)
+const promptMenuOpen = ref(false)
+const promptMenuRef = ref<HTMLElement | null>(null)
 const importing = ref(false)
 const importMsg = ref('')
 
@@ -31,6 +34,9 @@ function onDocumentClick(e: MouseEvent) {
   }
   if (difficultyMenuOpen.value && difficultyMenuRef.value && !difficultyMenuRef.value.contains(target)) {
     difficultyMenuOpen.value = false
+  }
+  if (promptMenuOpen.value && promptMenuRef.value && !promptMenuRef.value.contains(target)) {
+    promptMenuOpen.value = false
   }
 }
 
@@ -172,10 +178,11 @@ async function onImportFileChange(e: Event) {
   }
 }
 
-// Copies the LLM prompt (see shared/utils/import-prompt.ts) so the user can
-// paste it into whatever chat model they use along with a recipe from the
-// web, then bring the resulting JSON back through the ⬆ import button. The
-// toast spells that round trip out, since the button alone can't.
+// Copies the LLM prompt (see shared/utils/import-prompt.ts), in the
+// instruction language the user picks, so they can paste it into whatever
+// chat model they use along with a recipe from the web, then bring the
+// resulting JSON back through the ⬆ import button. The toast spells that
+// round trip out, since the button alone can't.
 const promptToast = ref('')
 let promptToastTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -218,8 +225,9 @@ function copyText(text: string): Promise<boolean> {
   return Promise.resolve(ok)
 }
 
-async function copyImportPrompt() {
-  const ok = await copyText(buildImportPrompt())
+async function copyImportPrompt(lang: PromptLang) {
+  promptMenuOpen.value = false
+  const ok = await copyText(buildImportPrompt(lang))
   showPromptToast(
     ok
       ? 'Prompt zkopírován. Vložte ho do ChatGPT, Claude nebo jiné AI, za něj přidejte recept z webu a výsledný JSON nahrajte tlačítkem ⬆.'
@@ -395,15 +403,33 @@ async function copyImportPrompt() {
       <NuxtLink to="/recipes/new" class="new-recipe-btn">
         {{ hasPendingDraft ? '✎ Pokračovat v rozpracovaném receptu' : '+ Nový recept' }}
       </NuxtLink>
-      <button
-        type="button"
-        class="prompt-btn"
-        aria-label="Zkopírovat prompt pro AI, který převede recept z webu na JSON k nahrání"
-        title="Zkopírovat prompt pro AI"
-        @click="copyImportPrompt"
-      >
-        ✨
-      </button>
+      <div ref="promptMenuRef" class="prompt-menu">
+        <button
+          type="button"
+          class="prompt-btn"
+          :class="{ active: promptMenuOpen }"
+          aria-label="Zkopírovat prompt pro AI, který převede recept z webu na JSON k nahrání"
+          title="Zkopírovat prompt pro AI"
+          aria-haspopup="menu"
+          :aria-expanded="promptMenuOpen"
+          @click="promptMenuOpen = !promptMenuOpen"
+        >
+          ✨
+        </button>
+        <div v-if="promptMenuOpen" class="filter-dropdown prompt-dropdown" role="menu">
+          <span class="prompt-dropdown-title">Jazyk instrukcí pro AI</span>
+          <button
+            v-for="lang in PROMPT_LANGS"
+            :key="lang"
+            type="button"
+            class="filter-option"
+            role="menuitem"
+            @click="copyImportPrompt(lang)"
+          >
+            {{ PROMPT_LANG_LABELS[lang] }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <InfoToast v-if="promptToast" :message="promptToast" @dismiss="dismissPromptToast" />
@@ -750,10 +776,15 @@ async function copyImportPrompt() {
   font-size: 15px;
 }
 
+.prompt-menu {
+  position: relative;
+  flex: none;
+  display: flex;
+}
+
 /* Square companion to the primary button: stretches to its height (13px
    padding + one 15px line ≈ 45px), so the width is pinned to match. */
 .prompt-btn {
-  flex: none;
   width: 45px;
   font-size: 18px;
   border-radius: 10px;
@@ -767,7 +798,23 @@ async function copyImportPrompt() {
   justify-content: center;
 }
 
-.prompt-btn:hover {
+.prompt-btn:hover,
+.prompt-btn.active {
   border-color: var(--accent);
+}
+
+/* The button sits at the bottom of the page, so its menu opens upward. */
+.prompt-dropdown {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.prompt-dropdown-title {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--surface-ink-dim);
+  padding: 6px 10px 4px;
 }
 </style>
