@@ -7,6 +7,7 @@ export function useRecipes() {
   const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined
 
   const listRecipes = () => $fetch<Recipe[]>('/api/recipes', { headers })
+  const listTags = () => $fetch<string[]>('/api/recipes/tags', { headers })
   const getRecipeById = (id: number) => $fetch<Recipe>(`/api/recipes/${id}`, { headers })
   const createRecipe = (input: RecipeInput) =>
     $fetch<Recipe>('/api/recipes', { method: 'POST', body: input, headers })
@@ -21,5 +22,5 @@ export function useRecipes() {
       headers,
     })
 
-  return { listRecipes, getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported, importRecipes }
+  return { listRecipes, listTags, getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported, importRecipes }
 }
