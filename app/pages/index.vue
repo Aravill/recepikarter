@@ -5,6 +5,7 @@ import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#s
 import type { Category, Difficulty, Recipe } from '#shared/types/recipe'
 
 const { listRecipes, importRecipes } = useRecipes()
+const { hasDraft } = useRecipeDraft()
 const { data: recipes, pending, refresh } = await useAsyncData('recipes', () => listRecipes())
 
 const search = ref('')
@@ -30,7 +31,14 @@ function onDocumentClick(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('click', onDocumentClick))
+// Read in onMounted, not at setup: the draft lives in localStorage, which
+// SSR can't see, and rendering the hint server-side would mismatch.
+const hasPendingDraft = ref(false)
+
+onMounted(() => {
+  document.addEventListener('click', onDocumentClick)
+  hasPendingDraft.value = hasDraft()
+})
 onUnmounted(() => document.removeEventListener('click', onDocumentClick))
 
 // Czech declines nouns/adjectives across cases ("mouka"/"mouky"/"moukou"),
@@ -297,7 +305,9 @@ async function onImportFileChange(e: Event) {
       </NuxtLink>
     </div>
 
-    <NuxtLink v-if="!pending" to="/recipes/new" class="new-recipe-btn">+ Nový recept</NuxtLink>
+    <NuxtLink v-if="!pending" to="/recipes/new" class="new-recipe-btn">
+      {{ hasPendingDraft ? '✎ Pokračovat v rozpracovaném receptu' : '+ Nový recept' }}
+    </NuxtLink>
   </div>
 </template>
 
