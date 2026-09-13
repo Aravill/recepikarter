@@ -209,13 +209,17 @@ function copyText(text: string): Promise<boolean> {
       () => false,
     )
   }
+  // Not readonly, and the range is set explicitly: iOS Safari ignores
+  // select() on a readonly textarea, then execCommand still reports success.
   const area = document.createElement('textarea')
   area.value = text
-  area.setAttribute('readonly', '')
+  area.setAttribute('aria-hidden', 'true')
   area.style.position = 'fixed'
   area.style.opacity = '0'
   document.body.appendChild(area)
+  area.focus()
   area.select()
+  area.setSelectionRange(0, text.length)
   let ok = false
   try {
     ok = document.execCommand('copy')
