@@ -78,8 +78,11 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   scale, don't reconcile the two.
 - Max content width: `640px`, centered — this is a personal recipe box, not a
   dashboard; a single readable column beats a wide layout on every screen
-  size, mobile included. **Exception:** the detail page at desktop widths
-  (see below) — screen efficiency wins there over the single-column rule.
+  size, mobile included. **Exceptions:** the detail page at desktop widths
+  (see below) — screen efficiency wins there over the single-column rule —
+  and the list page's card carousel at desktop widths, which needs ~1000px
+  to show three full cards side by side (the search/filter controls and the
+  row list around it stay in the 640px column).
 
 ## Components
 
@@ -123,9 +126,14 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   tap the handle) to expand it over the preview. Save/Delete pinned at its
   bottom, outside the scrollable form area.
 - **Card carousel** — the list page's default view. The active card sits
-  centered in a width-capped stage (desktop looks like phone), with the
-  previous/next cards peeking in from the stage's edges — reads as
-  side-by-side, not a layered deck, and makes clear you can go either way.
+  centered with the previous/next cards beside it — reads as side-by-side,
+  not a layered deck, and makes clear you can go either way. On a phone the
+  stage is width-capped so the neighbors only peek in from its edges; at
+  desktop widths (`≥900px`, the same breakpoint as the detail page) the
+  cards are scaled up ~1.3× as a whole (the card's own 240×502 layout never
+  reflows — it's the printed card) and the stage widens to exactly three
+  full cards, with a soft fade at its edges where the next-but-one cards
+  enter and leave.
   Wraparound is infinite in both directions through the current
   search+filter+sort order, even with only one or two matches (their
   neighbors are then clones of themselves). Drag the active card left/right
@@ -140,8 +148,12 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   instead reveals two buttons in its corner — ✎ opens the recipe's
   detail/edit page, ⬇ exports it — hidden the rest of the time so they don't
   clutter the card; tapping anywhere while they're shown dismisses them back
-  to the standard tap-to-flip/drag-to-swipe interactions, same gesture on
-  touch and with a mouse alike.
+  to the standard tap-to-flip/drag-to-swipe interactions. With a mouse
+  (fine pointer + hover) the same buttons simply appear while hovering the
+  center card, the center card and both neighbors show a pointer cursor
+  (click is the primary action there; dragging still works and shows a
+  grabbing cursor only once it has started), and with the stage focused
+  Enter/Space flip the card alongside the ←/→ navigation.
 
 ## Pages
 
