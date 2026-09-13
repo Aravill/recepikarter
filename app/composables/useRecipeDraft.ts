@@ -1,4 +1,4 @@
-import { emptyRecipeInput } from '#shared/types/recipe'
+import { CATEGORIES, DIFFICULTIES, emptyRecipeInput } from '#shared/types/recipe'
 import type { RecipeInput } from '#shared/types/recipe'
 
 // localStorage rather than sessionStorage: the whole point is surviving an
@@ -27,11 +27,17 @@ export function useRecipeDraft() {
     try {
       const raw = localStorage.getItem(storageKey.value)
       if (!raw) return null
-      const parsed = JSON.parse(raw) as Partial<RecipeInput>
+      const parsed: unknown = JSON.parse(raw)
+      if (typeof parsed !== 'object' || parsed === null) return null
       // Fill any field missing from an older draft so the form never sees
       // undefined where it expects an array or string.
-      const draft: RecipeInput = { ...emptyRecipeInput(), ...parsed }
+      const draft: RecipeInput = { ...emptyRecipeInput(), ...(parsed as Partial<RecipeInput>) }
       if (!Array.isArray(draft.ingredients) || !Array.isArray(draft.steps) || !Array.isArray(draft.tags)) {
+        return null
+      }
+      // A value outside the enums would render a blank <select> and only
+      // surface as the server's 400 on save.
+      if (!CATEGORIES.includes(draft.category) || !DIFFICULTIES.includes(draft.cookTimeDifficulty)) {
         return null
       }
       return isDraftEmpty(draft) ? null : draft
@@ -66,5 +72,5 @@ export function useRecipeDraft() {
     }
   }
 
-  return { loadDraft, hasDraft, saveDraft, clearDraft }
+  return { loadDraft, hasDraft, saveDraft, clearDraft, isDraftEmpty }
 }
