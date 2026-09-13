@@ -13,6 +13,7 @@ const props = withDefaults(
 const stripe = computed(() => difficultyColor(props.recipe.cookTimeDifficulty))
 const ingredients = computed(() => props.recipe.ingredients.filter((i) => i.trim()))
 const steps = computed(() => props.recipe.steps.filter((s) => s.trim()))
+const tags = computed(() => props.recipe.tags.filter((t) => t.trim()))
 // Only a saved Recipe carries an author (server-stamped on create) — a
 // RecipeInput being edited/previewed doesn't have one yet.
 const author = computed(() => ('author' in props.recipe ? props.recipe.author : ''))
@@ -49,6 +50,10 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
           <li v-for="(ingredient, i) in ingredients" :key="i">{{ ingredient }}</li>
         </ul>
       </div>
+
+      <ul v-if="tags.length" class="mini-tags" aria-label="Tagy">
+        <li v-for="tag in tags" :key="tag">{{ tag }}</li>
+      </ul>
 
       <div v-if="author" class="mini-footer">
         <span>Autor: {{ author }}</span>
@@ -214,6 +219,32 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Tags sit at the bottom of the front, just above the author line —
+   the ingredient list above them may scroll, this row never does. */
+.mini-tags {
+  list-style: none;
+  margin: auto 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: none;
+}
+
+.mini-tags li {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  color: var(--surface-ink-dim);
+}
+
+.mini-tags + .mini-footer {
+  margin-top: 0;
 }
 
 .mini-footer {
