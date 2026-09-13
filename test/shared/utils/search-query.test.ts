@@ -16,8 +16,7 @@ describe('parseSearchQuery', () => {
 
   it('recognises Czech aliases, case- and diacritics-insensitively', () => {
     expect(parseSearchQuery('Autor:admin')).toEqual({ key: 'author', term: 'admin' })
-    expect(parseSearchQuery('štítek:rychlovka')).toEqual({ key: 'tag', term: 'rychlovka' })
-    expect(parseSearchQuery('Stitek:rychlovka')).toEqual({ key: 'tag', term: 'rychlovka' })
+    expect(parseSearchQuery('Tag:rychlovka')).toEqual({ key: 'tag', term: 'rychlovka' })
     expect(parseSearchQuery('ingredience:mrkev')).toEqual({ key: 'ingredient', term: 'mrkev' })
     expect(parseSearchQuery('název:guláš')).toEqual({ key: 'name', term: 'guláš' })
   })

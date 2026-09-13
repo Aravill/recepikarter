@@ -181,7 +181,7 @@ async function onImportFileChange(e: Event) {
             v-model="search"
             class="search-input"
             type="search"
-            placeholder="Hledat… nebo autor:, štítek:, ingredience:"
+            placeholder="Hledat… nebo autor:, tag:, ingredience:"
           />
           <span v-if="searchKey" class="search-key" aria-live="polite">{{ SEARCH_KEY_LABELS[searchKey] }}</span>
         </div>

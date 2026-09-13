@@ -12,7 +12,7 @@ export type SearchKey = (typeof SEARCH_KEYS)[number]
 export const SEARCH_KEY_LABELS: Record<SearchKey, string> = {
   name: 'název',
   ingredient: 'ingredience',
-  tag: 'štítek',
+  tag: 'tag',
   author: 'autor',
 }
 
@@ -24,7 +24,6 @@ const KEY_ALIASES: Record<string, SearchKey> = {
   ingredience: 'ingredient',
   tag: 'tag',
   tags: 'tag',
-  stitek: 'tag',
   author: 'author',
   autor: 'author',
 }
