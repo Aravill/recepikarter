@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   if (!part || !part.data.length) {
     throw createError({ statusCode: 400, statusMessage: 'Chybí soubor s fotkou.' })
   }
-  if (!(PHOTO_MIME_TYPES as readonly string[]).includes(part.type ?? '')) {
+  if (!isPhotoMimeType(part.type)) {
     throw createError({ statusCode: 415, statusMessage: 'Podporované formáty jsou JPEG, PNG a WebP.' })
   }
 

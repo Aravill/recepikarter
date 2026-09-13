@@ -17,8 +17,12 @@ const THUMB_MAX_PX = 600
 // The prebuilt sharp binaries don't decode HEIC (patented HEVC), so iPhone
 // originals are out — in practice iOS converts to JPEG for `accept="image/*"`
 // file inputs, which is what the form uses.
-export const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 export const PHOTO_MAX_BYTES = 15 * 1024 * 1024
+
+export function isPhotoMimeType(type: string | undefined): boolean {
+  return !!type && PHOTO_MIME_TYPES.includes(type)
+}
 
 // Files are stored by basename only; the id + timestamp makes each upload a
 // new name, so a replaced photo never collides with browser caches of the
