@@ -4,7 +4,7 @@ import type { RecipeInput } from '#shared/types/recipe'
 
 const route = useRoute()
 const { getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported } = useRecipes()
-const { loadDraft, saveDraft, clearDraft } = useRecipeDraft()
+const { loadDraft, saveDraft, clearDraft, isDraftEmpty } = useRecipeDraft()
 
 const isNew = computed(() => route.params.id === 'new')
 const recipeId = computed(() => Number(route.params.id))
@@ -34,7 +34,7 @@ const flipCardRef = ref<{ frontEl: HTMLElement | null; backEl: HTMLElement | nul
 // row to fall back on, and a stale edit draft could silently overwrite
 // changes made from another device.
 const draftRestored = ref(false)
-const draftDirty = computed(() => isNew.value && JSON.stringify(form.value) !== JSON.stringify(emptyRecipeInput()))
+const draftDirty = computed(() => isNew.value && !isDraftEmpty(form.value))
 let draftToastTimer: ReturnType<typeof setTimeout> | null = null
 
 // The toast sits over the sheet footer on mobile, so it has to go away on
