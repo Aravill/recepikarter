@@ -7,6 +7,7 @@ import type { PromptLang } from '#shared/utils/import-prompt'
 import type { SearchKey } from '#shared/utils/search-query'
 import { CATEGORIES, CATEGORY_LABELS, DIFFICULTIES, DIFFICULTY_LABELS } from '#shared/types/recipe'
 import type { Category, Difficulty, Recipe } from '#shared/types/recipe'
+import { recipePhotoUrl } from '#shared/utils/recipe-photo'
 
 const { listRecipes, importRecipes } = useRecipes()
 const { hasDraft } = useRecipeDraft()
@@ -16,7 +17,13 @@ const search = ref('')
 const selectedCategory = ref<Category | null>(null)
 const selectedDifficulty = ref<Difficulty | null>(null)
 const sortBy = ref<'updated' | 'name' | 'time' | 'difficulty' | 'created-desc' | 'created-asc'>('updated')
-const viewMode = ref<'cards' | 'list'>('cards')
+type ViewMode = 'cards' | 'list' | 'gallery'
+const viewMode = ref<ViewMode>('cards')
+const VIEW_MODES: { mode: ViewMode; glyph: string; label: string }[] = [
+  { mode: 'cards', glyph: '⊞', label: 'Zobrazit karty' },
+  { mode: 'list', glyph: '☰', label: 'Zobrazit seznam' },
+  { mode: 'gallery', glyph: '▦', label: 'Zobrazit galerii' },
+]
 const categoryMenuOpen = ref(false)
 const categoryMenuRef = ref<HTMLElement | null>(null)
 const difficultyMenuOpen = ref(false)
@@ -343,14 +350,20 @@ async function copyImportPrompt(lang: PromptLang) {
             <option value="created-asc">datum vytvoření (nejstarší)</option>
           </select>
         </label>
-        <button
-          type="button"
-          class="view-toggle"
-          :aria-label="viewMode === 'cards' ? 'Zobrazit seznam' : 'Zobrazit karty'"
-          @click="viewMode = viewMode === 'cards' ? 'list' : 'cards'"
-        >
-          {{ viewMode === 'cards' ? '☰' : '⊞' }}
-        </button>
+        <div class="view-modes" role="group" aria-label="Zobrazení">
+          <button
+            v-for="view in VIEW_MODES"
+            :key="view.mode"
+            type="button"
+            class="view-mode"
+            :class="{ active: viewMode === view.mode }"
+            :aria-label="view.label"
+            :aria-pressed="viewMode === view.mode"
+            @click="viewMode = view.mode"
+          >
+            {{ view.glyph }}
+          </button>
+        </div>
         <button
           type="button"
           class="view-toggle"
@@ -379,6 +392,34 @@ async function copyImportPrompt(lang: PromptLang) {
 
     <div v-else-if="viewMode === 'cards'" class="carousel-wrap">
       <CardStack :recipes="sorted" />
+    </div>
+
+    <div v-else-if="viewMode === 'gallery'" class="gallery">
+      <NuxtLink
+        v-for="recipe in sorted"
+        :key="recipe.id"
+        :to="`/recipes/${recipe.id}`"
+        class="tile"
+        :class="{ 'no-photo': !recipe.photoFile }"
+        :style="{ '--edge': `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
+      >
+        <img v-if="recipe.photoFile" :src="recipePhotoUrl(recipe, 'thumb')!" alt="" class="tile-photo" loading="lazy">
+        <span class="tile-cap">
+          <span class="tile-eyebrow">{{ CATEGORY_LABELS[recipe.category] }}</span>
+          <span class="tile-name">{{ recipe.name }}</span>
+          <span class="tile-meta">
+            {{ recipe.cookTime }} min<template v-if="recipe.servings">
+              · {{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</template>
+          </span>
+          <span v-if="!recipe.photoFile" class="tile-add">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+              <circle cx="12" cy="13" r="3.2" />
+            </svg>
+            přidat fotku
+          </span>
+        </span>
+      </NuxtLink>
     </div>
 
     <div v-else class="list">
@@ -457,7 +498,7 @@ async function copyImportPrompt(lang: PromptLang) {
     max-width: 1000px;
   }
 
-  .list-page > :not(.carousel-wrap) {
+  .list-page > :not(.carousel-wrap, .gallery) {
     width: 100%;
     max-width: 640px;
     margin-inline: auto;
@@ -677,6 +718,33 @@ async function copyImportPrompt(lang: PromptLang) {
   justify-content: center;
 }
 
+.view-modes {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+
+.view-mode {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-mode.active {
+  background: var(--accent);
+  color: #fdf9f2;
+}
+
 .sort-by {
   display: flex;
   align-items: center;
@@ -756,6 +824,112 @@ async function copyImportPrompt(lang: PromptLang) {
   color: var(--surface-ink-dim);
   font-size: 17px;
   flex: none;
+}
+
+/* Gallery: photo tiles that rhyme with the list rows — same 14px radius,
+   same difficulty-coloured left edge — with the caption over a bottom
+   gradient. Recipes without a photo stay in the grid as paper tiles so the
+   gallery is the full collection, not just the photographed part. */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  --edge: var(--medium);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  border-left: 4px solid var(--edge);
+  text-decoration: none;
+}
+
+.tile-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tile-cap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 34px 12px 12px;
+  background: linear-gradient(to top, rgba(28, 22, 18, 0.82), rgba(28, 22, 18, 0));
+}
+
+.tile-eyebrow {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(253, 249, 242, 0.78);
+}
+
+.tile-name {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.15;
+  color: #fdf9f2;
+}
+
+.tile-meta {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(253, 249, 242, 0.78);
+}
+
+.tile.no-photo {
+  justify-content: center;
+}
+
+.tile.no-photo .tile-cap {
+  align-items: center;
+  text-align: center;
+  padding: 12px;
+  background: none;
+}
+
+.tile.no-photo .tile-name {
+  color: var(--surface-ink);
+}
+
+.tile.no-photo .tile-eyebrow,
+.tile.no-photo .tile-meta {
+  color: var(--surface-ink-dim);
+}
+
+.tile-add {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  color: var(--accent);
+}
+
+/* Like the carousel, the gallery gets the full 1000px desktop column. */
+@media (min-width: 900px) {
+  .gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .tile-name {
+    font-size: 17px;
+  }
 }
 
 .actions-row {

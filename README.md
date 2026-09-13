@@ -50,7 +50,8 @@ npm run dev
 ```
 
 The app runs at `http://localhost:3000`. The SQLite database is created on
-first run at `data/recipes.sqlite` (override with `RECIPE_DB_PATH`).
+first run at `data/recipes.sqlite` (override with `RECIPE_DB_PATH`). Uploaded
+recipe photos go to `data/photos/` (override with `RECIPE_PHOTOS_DIR`).
 
 ```bash
 npm run build     # production build

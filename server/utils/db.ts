@@ -27,7 +27,8 @@ db.exec(`
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     last_exported_at TEXT,
-    author TEXT NOT NULL DEFAULT ''
+    author TEXT NOT NULL DEFAULT '',
+    photo_file TEXT
   )
 `)
 
@@ -48,6 +49,10 @@ if (!recipeColumns.includes('author')) {
   // of leaving an empty author on cards that already existed.
   const fallbackAuthor = process.env.AUTH_USERNAME || 'admin'
   db.prepare("UPDATE recipes SET author = ? WHERE author = ''").run(fallbackAuthor)
+}
+
+if (!recipeColumns.includes('photo_file')) {
+  db.exec('ALTER TABLE recipes ADD COLUMN photo_file TEXT')
 }
 
 db.exec(`
@@ -76,6 +81,7 @@ interface RecipeRow {
   updated_at: string
   last_exported_at: string | null
   author: string
+  photo_file: string | null
 }
 
 function rowToRecipe(row: RecipeRow): Recipe {
@@ -93,6 +99,7 @@ function rowToRecipe(row: RecipeRow): Recipe {
     updatedAt: row.updated_at,
     lastExportedAt: row.last_exported_at,
     author: row.author,
+    photoFile: row.photo_file,
   }
 }
 
@@ -195,6 +202,14 @@ export function deleteRecipe(id: number): boolean {
 export function markExported(id: number): Recipe | undefined {
   const now = new Date().toISOString()
   db.prepare('UPDATE recipes SET last_exported_at = ? WHERE id = ?').run(now, id)
+  return getRecipe(id)
+}
+
+// Only records which file on disk is the recipe's photo — writing and
+// removing the actual files is server/utils/photos.ts's job.
+export function setRecipePhoto(id: number, file: string | null): Recipe | undefined {
+  const result = db.prepare('UPDATE recipes SET photo_file = ? WHERE id = ?').run(file, id)
+  if (result.changes === 0) return undefined
   return getRecipe(id)
 }
 

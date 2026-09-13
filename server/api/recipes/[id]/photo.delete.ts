@@ -1,12 +1,13 @@
 export default defineEventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
   const existing = getRecipe(id)
-  const deleted = deleteRecipe(id)
-  if (!deleted) {
+  if (!existing) {
     throw createError({ statusCode: 404, statusMessage: 'Recipe not found' })
   }
-  // The row is gone; its photo files on disk shouldn't outlive it.
-  if (existing?.photoFile) await removePhotoFiles(existing.photoFile)
+  if (existing.photoFile) {
+    setRecipePhoto(id, null)
+    await removePhotoFiles(existing.photoFile)
+  }
   setResponseStatus(event, 204)
   return null
 })

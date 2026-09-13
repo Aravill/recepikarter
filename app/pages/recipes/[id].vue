@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { emptyRecipeInput } from '#shared/types/recipe'
 import type { RecipeInput } from '#shared/types/recipe'
+import { recipePhotoUrl } from '#shared/utils/recipe-photo'
 
 const route = useRoute()
-const { getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported } = useRecipes()
+const { getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported, uploadPhoto, deletePhoto } =
+  useRecipes()
 const { loadDraft, saveDraft, clearDraft, isDraftEmpty } = useRecipeDraft()
 
 const isNew = computed(() => route.params.id === 'new')
@@ -16,9 +18,45 @@ const { data: existing, error: fetchError } = await useAsyncData(
 
 const form = ref<RecipeInput>(emptyRecipeInput())
 if (existing.value) {
-  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, lastExportedAt: _lastExportedAt, ...rest } =
-    existing.value
+  const {
+    id: _id,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    lastExportedAt: _lastExportedAt,
+    photoFile: _photoFile,
+    ...rest
+  } = existing.value
   form.value = rest
+}
+
+// The photo is saved with the rest of the form, not the moment it's
+// picked: until "Uložit" the file only lives here (a new recipe has no id
+// to upload against yet, and this keeps one rule for every field). It's
+// deliberately not part of the localStorage draft — a File can't be.
+const pendingPhoto = ref<File | null>(null)
+const pendingPhotoUrl = ref<string | null>(null)
+const photoRemoved = ref(false)
+// Set by the create flow when the recipe saved but its photo didn't, read
+// by the recipe's page after the redirect so the failure isn't silent.
+const photoUploadFailed = useState('photo-upload-failed', () => false)
+const photoFailedToast = ref(false)
+
+const photoUrl = computed(() => {
+  if (pendingPhoto.value) return pendingPhotoUrl.value
+  if (photoRemoved.value || !existing.value) return null
+  return recipePhotoUrl(existing.value, 'full')
+})
+
+function onPhotoChange(file: File | null) {
+  if (pendingPhotoUrl.value) URL.revokeObjectURL(pendingPhotoUrl.value)
+  pendingPhoto.value = file
+  pendingPhotoUrl.value = file ? URL.createObjectURL(file) : null
+  photoRemoved.value = !file
+}
+
+function resetPhotoState() {
+  onPhotoChange(null)
+  photoRemoved.value = false
 }
 
 const side = ref<'front' | 'back'>('front')
@@ -50,6 +88,12 @@ function dismissDraftToast() {
 }
 
 onMounted(() => {
+  if (photoUploadFailed.value) {
+    photoUploadFailed.value = false
+    // A toast rather than the sheet's error line: on a phone the sheet is
+    // collapsed after the redirect, so anything inside it goes unseen.
+    photoFailedToast.value = true
+  }
   if (!isNew.value) return
   const draft = loadDraft()
   if (draft) {
@@ -62,6 +106,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (draftToastTimer) clearTimeout(draftToastTimer)
   if (savedTimer) clearTimeout(savedTimer)
+  if (pendingPhotoUrl.value) URL.revokeObjectURL(pendingPhotoUrl.value)
 })
 
 watch(
@@ -124,17 +169,55 @@ async function onSave() {
     }
     if (isNew.value) {
       const created = await createRecipe(payload)
+      // The recipe exists now, so a failed upload must not fail the save
+      // (retrying would create a duplicate) — flag it for the redirect.
+      if (pendingPhoto.value) {
+        await uploadPhoto(created.id, pendingPhoto.value).catch(() => {
+          photoUploadFailed.value = true
+        })
+      }
       // The form stays live (and the draft watcher armed) while the
       // checkmark shows, so clear the draft right before leaving, not now.
+      // The page component is reused across /recipes/new → /recipes/:id,
+      // so the pending photo has to be dropped too or it would upload
+      // again on the next save.
       showSaved(() => {
         clearDraft()
+        resetPhotoState()
         return navigateTo(`/recipes/${created.id}`)
       })
     } else {
-      const updated = await updateRecipe(recipeId.value, payload)
-      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, lastExportedAt: _lastExportedAt, ...rest } =
-        updated
+      let updated = await updateRecipe(recipeId.value, payload)
+      let photoError = ''
+      try {
+        if (pendingPhoto.value) {
+          updated = await uploadPhoto(recipeId.value, pendingPhoto.value)
+        } else if (photoRemoved.value && existing.value?.photoFile) {
+          await deletePhoto(recipeId.value)
+          updated = { ...updated, photoFile: null }
+        }
+      } catch (e) {
+        // The text is saved at this point; only the photo step failed. Say
+        // so, and keep the pending photo so another Uložit retries it.
+        const err = e as { data?: { statusMessage?: string } }
+        photoError = err?.data?.statusMessage || 'Fotku se nepodařilo nahrát.'
+      }
+      existing.value = updated
+      if (!photoError) resetPhotoState()
+      const {
+        id: _id,
+        createdAt: _createdAt,
+        updatedAt: _updatedAt,
+        lastExportedAt: _lastExportedAt,
+        photoFile: _photoFile,
+        ...rest
+      } = updated
       form.value = rest
+      if (photoError) {
+        errorMsg.value = `Recept je uložený, fotka ne: ${photoError}`
+        saveState.value = 'idle'
+        return
+      }
       showSaved(() => {
         sheetExpanded.value = false
       })
@@ -179,7 +262,8 @@ async function onDelete() {
   <div v-else class="detail-screen">
     <button class="floating-back" aria-label="Zpět" @click="navigateTo('/')">‹</button>
 
-    <div class="detail-preview">
+    <div class="detail-preview" :class="{ 'has-photo': !!photoUrl }">
+      <img v-if="photoUrl" :src="photoUrl" alt="" class="detail-hero">
       <div class="preview-tabs">
         <button :class="{ active: side === 'front' }" @click="setSide('front')">Přední strana</button>
         <button :class="{ active: side === 'back' }" @click="setSide('back')">Zadní strana</button>
@@ -206,7 +290,7 @@ async function onDelete() {
 
       <div class="sheet-scroll">
         <p v-if="errorMsg" class="form-error">{{ errorMsg }}</p>
-        <RecipeForm v-model="form" />
+        <RecipeForm v-model="form" :photo-url="photoUrl" @photo-change="onPhotoChange" />
       </div>
 
       <div class="sheet-footer">
@@ -228,6 +312,11 @@ async function onDelete() {
       </div>
     </div>
 
+    <InfoToast
+      v-if="photoFailedToast"
+      message="Recept je uložený, ale fotku se nepodařilo nahrát. Zkuste ji přidat znovu."
+      @dismiss="photoFailedToast = false"
+    />
     <InfoToast
       v-if="draftRestored"
       message="Obnovili jsme váš rozpracovaný recept. Ukládá se průběžně, dokud ho neuložíte nebo nezahodíte."
@@ -263,6 +352,22 @@ async function onDelete() {
   align-items: center;
   padding-top: 20px;
   gap: 16px;
+}
+
+.detail-preview.has-photo {
+  padding-top: 0;
+}
+
+/* Photo strip above the card. Sized so the card still clears the collapsed
+   sheet on a phone: header 49 + strip 140 + gap 16 + tabs 29 + gap 16 +
+   card 502 = 752 px, the sheet handle starts at ~760. */
+.detail-hero {
+  width: 100%;
+  height: 140px;
+  flex: none;
+  object-fit: cover;
+  display: block;
+  background: var(--bg-raised);
 }
 
 .floating-back {
@@ -535,6 +640,13 @@ async function onDelete() {
     padding-top: 0;
   }
 
+  .detail-hero {
+    width: 280px;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    border-radius: 14px;
+  }
+
   .sheet {
     grid-column: 1;
     grid-row: 2;
@@ -561,6 +673,7 @@ async function onDelete() {
 @media print {
   .floating-back,
   .preview-tabs,
+  .detail-hero,
   .sheet {
     display: none;
   }

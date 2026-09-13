@@ -5,6 +5,46 @@ import { normalizeRecipeName } from '#shared/utils/recipe-name'
 
 const model = defineModel<RecipeInput>({ required: true })
 
+// The photo isn't part of RecipeInput (it's a file, not JSON, and only
+// gets persisted after the recipe exists), so it rides beside the model:
+// the parent owns the pending file and what to preview, this form only
+// picks and clears.
+const props = defineProps<{ photoUrl: string | null }>()
+const emit = defineEmits<{ photoChange: [file: File | null] }>()
+
+const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const PHOTO_MAX_BYTES = 15 * 1024 * 1024
+
+const photoInputRef = ref<HTMLInputElement | null>(null)
+const photoError = ref('')
+
+function pickPhoto() {
+  photoInputRef.value?.click()
+}
+
+function onPhotoFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  // Reset so picking the same file again after "Odebrat" still fires change.
+  input.value = ''
+  if (!file) return
+  if (!PHOTO_MIME_TYPES.includes(file.type)) {
+    photoError.value = 'Podporované formáty jsou JPEG, PNG a WebP.'
+    return
+  }
+  if (file.size > PHOTO_MAX_BYTES) {
+    photoError.value = 'Fotka je příliš velká (max. 15 MB).'
+    return
+  }
+  photoError.value = ''
+  emit('photoChange', file)
+}
+
+function removePhoto() {
+  photoError.value = ''
+  emit('photoChange', null)
+}
+
 const { listTags } = useRecipes()
 // Suggestions only matter once someone is typing, so they're fetched on
 // the client after hydration rather than as part of the SSR response.
@@ -119,6 +159,33 @@ function removeStep(i: number) {
         <input id="f-servings" v-model="model.servings" type="text" placeholder="4" />
       </div>
     </div>
+  </div>
+
+  <div class="form-section">
+    <span class="section-heading">Fotka</span>
+    <input
+      ref="photoInputRef"
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      hidden
+      @change="onPhotoFileChange"
+    >
+    <div v-if="props.photoUrl" class="photo-field">
+      <div class="photo-thumb"><img :src="props.photoUrl" alt=""></div>
+      <div class="photo-actions">
+        <button type="button" class="photo-btn" @click="pickPhoto">Nahradit</button>
+        <button type="button" class="photo-btn danger" @click="removePhoto">Odebrat</button>
+      </div>
+    </div>
+    <button v-else type="button" class="photo-drop" @click="pickPhoto">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+        <circle cx="12" cy="13" r="3.2" />
+      </svg>
+      <span class="photo-drop-title">Přidat fotku jídla</span>
+      <span class="photo-drop-hint">Vyfotit nebo vybrat z galerie · JPEG, PNG, WebP</span>
+    </button>
+    <p v-if="photoError" class="photo-error">{{ photoError }}</p>
   </div>
 
   <div class="form-section">
@@ -267,6 +334,93 @@ function removeStep(i: number) {
   border-style: solid;
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.photo-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 16px;
+  border: 1px dashed var(--rule);
+  border-radius: 10px;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.photo-drop:hover,
+.photo-drop:focus-visible {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.photo-drop-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--surface-ink);
+}
+
+.photo-drop-hint {
+  font-size: 12px;
+  color: var(--surface-ink-dim);
+}
+
+.photo-field {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.photo-thumb {
+  width: 112px;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  flex: none;
+  background: var(--rule);
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.photo-btn {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--surface-ink);
+  cursor: pointer;
+}
+
+.photo-btn:hover {
+  border-color: var(--surface-ink-dim);
+}
+
+.photo-btn.danger {
+  color: var(--hard);
+  border-color: var(--hard);
+}
+
+.photo-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--hard);
 }
 
 .add-link {
