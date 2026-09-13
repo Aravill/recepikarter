@@ -39,6 +39,7 @@ const photoRemoved = ref(false)
 // Set by the create flow when the recipe saved but its photo didn't, read
 // by the recipe's page after the redirect so the failure isn't silent.
 const photoUploadFailed = useState('photo-upload-failed', () => false)
+const photoFailedToast = ref(false)
 
 const photoUrl = computed(() => {
   if (pendingPhoto.value) return pendingPhotoUrl.value
@@ -89,7 +90,9 @@ function dismissDraftToast() {
 onMounted(() => {
   if (photoUploadFailed.value) {
     photoUploadFailed.value = false
-    errorMsg.value = 'Recept je uložený, ale fotku se nepodařilo nahrát. Zkuste ji přidat znovu.'
+    // A toast rather than the sheet's error line: on a phone the sheet is
+    // collapsed after the redirect, so anything inside it goes unseen.
+    photoFailedToast.value = true
   }
   if (!isNew.value) return
   const draft = loadDraft()
@@ -185,14 +188,22 @@ async function onSave() {
       })
     } else {
       let updated = await updateRecipe(recipeId.value, payload)
-      if (pendingPhoto.value) {
-        updated = await uploadPhoto(recipeId.value, pendingPhoto.value)
-      } else if (photoRemoved.value && existing.value?.photoFile) {
-        await deletePhoto(recipeId.value)
-        updated = { ...updated, photoFile: null }
+      let photoError = ''
+      try {
+        if (pendingPhoto.value) {
+          updated = await uploadPhoto(recipeId.value, pendingPhoto.value)
+        } else if (photoRemoved.value && existing.value?.photoFile) {
+          await deletePhoto(recipeId.value)
+          updated = { ...updated, photoFile: null }
+        }
+      } catch (e) {
+        // The text is saved at this point; only the photo step failed. Say
+        // so, and keep the pending photo so another Uložit retries it.
+        const err = e as { data?: { statusMessage?: string } }
+        photoError = err?.data?.statusMessage || 'Fotku se nepodařilo nahrát.'
       }
       existing.value = updated
-      resetPhotoState()
+      if (!photoError) resetPhotoState()
       const {
         id: _id,
         createdAt: _createdAt,
@@ -202,6 +213,11 @@ async function onSave() {
         ...rest
       } = updated
       form.value = rest
+      if (photoError) {
+        errorMsg.value = `Recept je uložený, fotka ne: ${photoError}`
+        saveState.value = 'idle'
+        return
+      }
       showSaved(() => {
         sheetExpanded.value = false
       })
@@ -296,6 +312,11 @@ async function onDelete() {
       </div>
     </div>
 
+    <InfoToast
+      v-if="photoFailedToast"
+      message="Recept je uložený, ale fotku se nepodařilo nahrát. Zkuste ji přidat znovu."
+      @dismiss="photoFailedToast = false"
+    />
     <InfoToast
       v-if="draftRestored"
       message="Obnovili jsme váš rozpracovaný recept. Ukládá se průběžně, dokud ho neuložíte nebo nezahodíte."

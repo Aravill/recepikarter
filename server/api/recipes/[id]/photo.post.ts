@@ -22,7 +22,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Recipe not found' })
   }
 
-  const file = await storeRecipePhoto(id, part.data)
+  // The MIME type comes from the browser (i.e. the file extension), so a
+  // renamed HEIC or a truncated download gets this far and fails in sharp.
+  const file = await storeRecipePhoto(id, part.data).catch(() => {
+    throw createError({ statusCode: 415, statusMessage: 'Fotku se nepodařilo přečíst — podporované formáty jsou JPEG, PNG a WebP.' })
+  })
   const recipe = setRecipePhoto(id, file)
   if (!recipe) {
     // Recipe vanished between the read and the update — don't leave the

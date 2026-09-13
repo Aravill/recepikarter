@@ -167,7 +167,6 @@ function removeStep(i: number) {
       ref="photoInputRef"
       type="file"
       accept="image/jpeg,image/png,image/webp"
-      capture="environment"
       hidden
       @change="onPhotoFileChange"
     >
