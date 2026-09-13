@@ -59,9 +59,14 @@ export interface Recipe {
   // which cards are new since the last print run, and — later — whether a
   // card has changed since it was last exported.
   lastExportedAt: string | null
+  // Basename of the stored photo (see server/utils/photos.ts), or null when
+  // the recipe has none. Managed by the /api/recipes/:id/photo routes, never
+  // part of the editable input — the filename changes on every upload, so it
+  // doubles as a cache-buster in the served URL.
+  photoFile: string | null
 }
 
-export type RecipeInput = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'lastExportedAt' | 'author'>
+export type RecipeInput = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'lastExportedAt' | 'author' | 'photoFile'>
 
 // Accent color (the difficulty stripe) is derived from difficulty, not
 // stored, and not category — see docs/design-system.md. Category stays a

@@ -10,6 +10,7 @@ import {
   listTags,
   listUsers,
   markExported,
+  setRecipePhoto,
   setUserPassword,
   setUserStatus,
   updateRecipe,
@@ -56,6 +57,19 @@ describe('recipes db', () => {
 
   it('returns undefined when marking a recipe that does not exist as exported', () => {
     expect(markExported(999999)).toBeUndefined()
+  })
+
+  it('records and clears the photo file without touching it on update', () => {
+    const created = createRecipe(sampleInput(), 'michal')
+    expect(created.photoFile).toBeNull()
+
+    expect(setRecipePhoto(created.id, '1-1700000000000.webp')?.photoFile).toBe('1-1700000000000.webp')
+    expect(updateRecipe(created.id, sampleInput({ name: 'Guláš II' }))?.photoFile).toBe('1-1700000000000.webp')
+    expect(setRecipePhoto(created.id, null)?.photoFile).toBeNull()
+  })
+
+  it('returns undefined when setting a photo on a recipe that does not exist', () => {
+    expect(setRecipePhoto(999999, 'x.webp')).toBeUndefined()
   })
 
   it('lists distinct tags most-used first, merging case/diacritic variants', () => {
