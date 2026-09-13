@@ -23,7 +23,12 @@ if (existing.value) {
 
 const side = ref<'front' | 'back'>('front')
 const sheetExpanded = ref(isNew.value)
-const saving = ref(false)
+// 'saved' briefly shows a checkmark on the save button before the sheet
+// collapses (edit) or the page navigates to the new recipe (create), so
+// a successful save is visible rather than just the label flipping back.
+const saveState = ref<'idle' | 'saving' | 'saved'>('idle')
+const SAVED_FEEDBACK_MS = 1100
+let savedTimer: ReturnType<typeof setTimeout> | null = null
 const deleting = ref(false)
 const exporting = ref(false)
 const errorMsg = ref('')
@@ -56,6 +61,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (draftToastTimer) clearTimeout(draftToastTimer)
+  if (savedTimer) clearTimeout(savedTimer)
 })
 
 watch(
@@ -109,7 +115,7 @@ function onPrint() {
 
 async function onSave() {
   errorMsg.value = ''
-  saving.value = true
+  saveState.value = 'saving'
   try {
     const payload: RecipeInput = {
       ...form.value,
@@ -119,20 +125,31 @@ async function onSave() {
     if (isNew.value) {
       const created = await createRecipe(payload)
       clearDraft()
-      await navigateTo(`/recipes/${created.id}`)
+      showSaved(() => navigateTo(`/recipes/${created.id}`))
     } else {
       const updated = await updateRecipe(recipeId.value, payload)
       const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, lastExportedAt: _lastExportedAt, ...rest } =
         updated
       form.value = rest
-      sheetExpanded.value = false
+      showSaved(() => {
+        sheetExpanded.value = false
+      })
     }
   } catch (e) {
     const err = e as { data?: { statusMessage?: string } }
     errorMsg.value = err?.data?.statusMessage || 'Uložení se nezdařilo.'
-  } finally {
-    saving.value = false
+    saveState.value = 'idle'
   }
+}
+
+// Holds the checkmark on screen for a moment before the follow-up action
+// hides the footer (collapse) or leaves the page (navigate).
+function showSaved(then: () => unknown) {
+  saveState.value = 'saved'
+  savedTimer = setTimeout(async () => {
+    await then()
+    saveState.value = 'idle'
+  }, SAVED_FEEDBACK_MS)
 }
 
 async function onDelete() {
@@ -193,8 +210,16 @@ async function onDelete() {
         <button v-if="draftDirty" class="btn btn-danger" title="Zahodit rozpracovaný recept" @click="onDiscardDraft">
           ✕
         </button>
-        <button class="btn btn-primary" :disabled="saving" @click="onSave">
-          {{ saving ? 'Ukládám…' : 'Uložit' }}
+        <button
+          class="btn btn-primary"
+          :class="{ saved: saveState === 'saved' }"
+          :disabled="saveState !== 'idle'"
+          :aria-live="saveState === 'idle' ? undefined : 'polite'"
+          @click="onSave"
+        >
+          <span v-if="saveState === 'saving'" class="save-spinner" aria-hidden="true" />
+          <span v-else-if="saveState === 'saved'" class="save-check" aria-hidden="true">✓</span>
+          {{ saveState === 'saving' ? 'Ukládám…' : saveState === 'saved' ? 'Uloženo' : 'Uložit' }}
         </button>
       </div>
     </div>
@@ -406,8 +431,56 @@ async function onDelete() {
 }
 
 .sheet-footer .btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: var(--accent);
   color: #fdf9f2;
+  transition: background-color 0.2s ease;
+}
+
+.sheet-footer .btn-primary.saved,
+.sheet-footer .btn-primary.saved:disabled {
+  background: var(--easy);
+  opacity: 1;
+}
+
+.save-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(253, 249, 242, 0.35);
+  border-top-color: #fdf9f2;
+  animation: save-spin 0.7s linear infinite;
+}
+
+.save-check {
+  font-size: 15px;
+  line-height: 1;
+  animation: save-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes save-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes save-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-spinner,
+  .save-check {
+    animation: none;
+  }
 }
 
 .sheet-footer .btn-danger {
