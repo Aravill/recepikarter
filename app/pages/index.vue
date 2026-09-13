@@ -401,7 +401,7 @@ async function onImportFileChange(e: Event) {
 .search-field.keyed .search-input {
   padding-right: 96px;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(184, 80, 42, 0.22);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 /* The key appears while the user is typing, i.e. focused — the default
@@ -409,7 +409,7 @@ async function onImportFileChange(e: Event) {
    the focus indicator in this state. */
 .search-field.keyed .search-input:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(184, 80, 42, 0.38);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 .search-key {
