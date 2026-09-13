@@ -105,7 +105,7 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   re-run that if `icon.svg` changes, these aren't generated automatically.
 - **Icon buttons** — this app prefers a pictograph over a text label once the
   meaning is unambiguous from context: 🏷️ opens the category dropdown, 🎚️
-  opens the difficulty dropdown, ☰/⊞ toggles list/card view, ↕ marks the sort
+  opens the difficulty dropdown, ⊞/☰/▦ picks the card/list/gallery view, ↕ marks the sort
   control, ⬆ uploads a JSON file, ✎/⬇/`{}` edit/export-PNG/export-JSON a card
   from the stack. The edit/export cluster stays in one plain, monochrome
   symbol style (no color emoji mixed in) since those three sit side by side
@@ -125,6 +125,22 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
   "Upravit recept" label + quick download/print icons) by default; drag (or
   tap the handle) to expand it over the preview. Save/Delete pinned at its
   bottom, outside the scrollable form area.
+- **Gallery tile** — the list page's third view. `4:3` photo tile, `14px`
+  radius, the same 4px difficulty-coloured left edge as a list row, caption
+  (category eyebrow · name in Display M · time/servings in Data) over a
+  bottom gradient. Recipes without a photo stay in the grid as `--surface`
+  tiles with a centered caption and a "přidat fotku" nudge, so the gallery
+  is always the whole collection. Two columns on a phone, three at desktop
+  widths in the carousel's 1000px column.
+- **Photo strip** — on the detail page a recipe's photo sits *above* the
+  card preview, never on the card: a full-width 140px strip on mobile (the
+  back button floats over it), a 280px `4:3` block with `14px` radius above
+  the tabs on desktop. Hidden in print. The card is the printed object and
+  stays photo-free by design.
+- **Photo field** — the edit form's *Fotka* section: a dashed dropzone
+  (camera icon, "Přidat fotku jídla") that opens the camera on a phone, or a
+  112px `4:3` thumbnail with ghost *Nahradit* / *Odebrat* buttons. Changes
+  apply on *Uložit* like every other field.
 - **Card carousel** — the list page's default view. The active card sits
   centered with the previous/next cards beside it — reads as side-by-side,
   not a layered deck, and makes clear you can go either way. On a phone the
@@ -163,8 +179,9 @@ All three faces carry `latin-ext`, so Czech diacritics (`á č ď é ě í ň ó
 2. **List** — search (fuzzy), with a 🏷️ category-picker and a 🎚️
    difficulty-picker dropdown side by side next to the search field, plus
    sort (name / time / difficulty / last updated, behind an ↕ icon).
-   Defaults to the card stack (see Components); a ☰/⊞ icon button toggles a
-   traditional row list, and back. Changing the search, filter, or sort
+   Defaults to the card stack (see Components); a three-way ⊞/☰/▦ segmented
+   control switches between it, a traditional row list, and the photo
+   gallery (see Components). Changing the search, filter, or sort
    resets browsing to the first card. Result count reads "Nalezeno: *n*",
    not a grammatically pluralized "*n* receptů" — simpler, and avoids
    Czech's three-way plural agreement entirely.
