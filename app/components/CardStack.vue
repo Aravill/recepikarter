@@ -27,6 +27,11 @@ const index = ref(0)
 const side = ref<'front' | 'back'>('front')
 const actionsShown = ref(false)
 const exporting = ref(false)
+// Shopping mode: the center card's ingredients become a tick-off list and
+// the stack freezes around it — no swipe, flip, long press, keyboard nav or
+// actions until the user leaves the mode via the button under the card.
+// The ticks themselves live in RecipeCard and are forgotten on exit.
+const shopping = ref(false)
 // The track's current translateX, in px. Tracks the live drag 1:1 while
 // dragging; animated (via CSS transition) to a target slot offset or back
 // to 0 otherwise.
@@ -99,6 +104,9 @@ watch(
     index.value = 0
     side.value = 'front'
     actionsShown.value = false
+    // The list under the stack changed (filter/search) — the card being
+    // shopped for may not even be in it anymore.
+    shopping.value = false
   },
 )
 
@@ -136,6 +144,18 @@ function onEdit() {
   if (current.value) navigateTo(`/recipes/${current.value.id}`)
 }
 
+function enterShopping() {
+  if (!current.value) return
+  actionsShown.value = false
+  // Ingredients are on the front.
+  side.value = 'front'
+  shopping.value = true
+}
+
+function exitShopping() {
+  shopping.value = false
+}
+
 function clearLongPressTimer() {
   if (longPressTimer !== null) {
     clearTimeout(longPressTimer)
@@ -160,7 +180,7 @@ function animateTrackTo(target: number, onSettled: () => void) {
 }
 
 function slideTo(direction: 1 | -1) {
-  if (sliding.value || n.value === 0) return
+  if (sliding.value || shopping.value || n.value === 0) return
   animateTrackTo(direction === 1 ? -slotPx : slotPx, () => {
     index.value = wrapIndex(index.value + direction, n.value)
     // The window re-renders around the new index, so the after-state is
@@ -192,7 +212,10 @@ function getSlotOffset(target: HTMLElement): number | null {
 
 function onPointerDown(e: PointerEvent) {
   if ((e.target as HTMLElement).closest('.card-action-btn')) return
-  if (sliding.value) return
+  // In shopping mode the only interaction on the track is ticking the
+  // checkboxes, which are plain native inputs — leaving the pointer alone
+  // here is what lets their clicks through untouched.
+  if (sliding.value || shopping.value) return
   dragging.value = true
   movedPastTapThreshold = false
   longPressFired = false
@@ -272,6 +295,7 @@ function flipCenter() {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if (shopping.value) return
   if (e.key === 'ArrowLeft') goPrev()
   else if (e.key === 'ArrowRight') goNext()
   else if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
@@ -288,6 +312,7 @@ function onKeydown(e: KeyboardEvent) {
     <div
       ref="stageRef"
       class="stage"
+      :class="{ shopping }"
       tabindex="0"
       :style="{
         '--card-width': `${CARD_WIDTH}px`,
@@ -319,11 +344,12 @@ function onKeydown(e: KeyboardEvent) {
             zIndex: 10 - Math.abs(slot.offset),
           }"
         >
-          <FlipCard v-if="slot.offset === 0" :ref="setFlipCardRef" :recipe="slot.recipe" :side="side" />
+          <FlipCard v-if="slot.offset === 0" :ref="setFlipCardRef" :recipe="slot.recipe" :side="side" :shopping="shopping" />
           <RecipeCard v-else :recipe="slot.recipe" side="front" />
 
-          <div v-if="slot.offset === 0" class="card-actions" :class="{ shown: actionsShown }">
+          <div v-if="slot.offset === 0 && !shopping" class="card-actions" :class="{ shown: actionsShown }">
             <button class="card-action-btn" aria-label="Upravit recept" @click.stop="onEdit">✎</button>
+            <button class="card-action-btn" aria-label="Nákupní režim" @click.stop="enterShopping">🛒</button>
             <button
               class="card-action-btn"
               aria-label="Stáhnout PNG"
@@ -338,7 +364,13 @@ function onKeydown(e: KeyboardEvent) {
       </div>
     </div>
 
-    <div v-if="recipes.length" class="stack-nav">
+    <div v-if="recipes.length && shopping" class="stack-nav">
+      <button type="button" class="shopping-exit" @click="exitShopping">
+        <span aria-hidden="true">🛒</span>
+        Ukončit nákupní režim
+      </button>
+    </div>
+    <div v-else-if="recipes.length" class="stack-nav">
       <button type="button" aria-label="Předchozí recept" @click="goPrev">‹</button>
       <span class="stack-count">{{ index + 1 }} / {{ recipes.length }}</span>
       <button type="button" aria-label="Další recept" @click="goNext">›</button>
@@ -449,6 +481,26 @@ function onKeydown(e: KeyboardEvent) {
     pointer-events: auto;
     transform: translate(0, 0) scale(1);
   }
+
+  /* Neighbors aren't click targets while shopping, so don't advertise it. */
+  .stage.shopping .card-slot:not(.center) {
+    cursor: default;
+  }
+
+  .stage.shopping .card-slot:not(.center):hover {
+    opacity: var(--neighbor-opacity);
+  }
+}
+
+/* Shopping mode: the track stays put and the neighbors recede so the
+   center card reads as the single thing on screen. */
+.stage.shopping .track {
+  cursor: default;
+}
+
+.stage.shopping .card-slot:not(.center) {
+  opacity: calc(var(--neighbor-opacity) * 0.5);
+  transition: opacity 0.18s ease;
 }
 
 /* ±2 slots exist purely so a card is already in place when the track
@@ -519,6 +571,18 @@ function onKeydown(e: KeyboardEvent) {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Same specificity as the `.stack-nav button` rule above, or its fixed
+   36px width would win and squash the label. */
+.stack-nav .shopping-exit {
+  width: auto;
+  padding: 0 16px;
+  border-color: var(--accent);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  gap: 8px;
 }
 
 .stack-count {
