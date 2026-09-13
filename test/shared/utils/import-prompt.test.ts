@@ -3,6 +3,9 @@ import { CATEGORIES, DIFFICULTIES } from '../../../shared/types/recipe'
 import { PROMPT_LANGS, buildImportPrompt } from '../../../shared/utils/import-prompt'
 import { parseRecipeInput } from '../../../server/utils/validate'
 
+// The filename example in the prompt should match the worked example's name.
+const EXAMPLE_NAME = 'Bramboračka'
+
 const EXAMPLE_HEADING: Record<(typeof PROMPT_LANGS)[number], string> = {
   en: 'EXAMPLE OUTPUT',
   cs: 'PŘÍKLAD VÝSTUPU',
@@ -29,6 +32,10 @@ describe.each(PROMPT_LANGS)('buildImportPrompt(%s)', (lang) => {
     expect(prompt).toContain('125 g mouky')
     expect(prompt).toMatch(/\bml\b/)
     expect(prompt).toMatch(/\bkg\b/)
+  })
+
+  it('asks for the output as a downloadable file named after the recipe', () => {
+    expect(prompt).toContain(`"${EXAMPLE_NAME}.json"`)
   })
 
   it('ends where the user pastes their recipe', () => {

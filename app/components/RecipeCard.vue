@@ -6,8 +6,12 @@ const props = withDefaults(
   defineProps<{
     recipe: Recipe | RecipeInput
     side?: 'front' | 'back'
+    // Shopping mode: the front's ingredient bullets become checkboxes so
+    // the card can be ticked off in a shop. Purely visual state — see
+    // `checked` below.
+    shopping?: boolean
   }>(),
-  { side: 'front' },
+  { side: 'front', shopping: false },
 )
 
 const stripe = computed(() => difficultyColor(props.recipe.cookTimeDifficulty))
@@ -17,6 +21,25 @@ const tags = computed(() => props.recipe.tags.filter((t) => t.trim()))
 // Only a saved Recipe carries an author (server-stamped on create) — a
 // RecipeInput being edited/previewed doesn't have one yet.
 const author = computed(() => ('author' in props.recipe ? props.recipe.author : ''))
+
+// Which ingredients (by index into `ingredients`) are ticked off. Deliberately
+// not persisted anywhere: a shopping list is done once the trip is, so
+// leaving shopping mode simply forgets it.
+const checked = ref(new Set<number>())
+
+watch(
+  () => props.shopping,
+  (shopping) => {
+    if (!shopping) checked.value = new Set()
+  },
+)
+
+function toggleChecked(i: number) {
+  const next = new Set(checked.value)
+  if (next.has(i)) next.delete(i)
+  else next.add(i)
+  checked.value = next
+}
 </script>
 
 <template>
@@ -46,8 +69,14 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
 
       <div v-if="ingredients.length" class="mini-ingredients">
         <p class="mini-section">SUROVINY</p>
-        <ul class="mini-list">
-          <li v-for="(ingredient, i) in ingredients" :key="i">{{ ingredient }}</li>
+        <ul class="mini-list" :class="{ shopping }">
+          <li v-for="(ingredient, i) in ingredients" :key="i" :class="{ checked: checked.has(i) }">
+            <label v-if="shopping" class="mini-check">
+              <input type="checkbox" :checked="checked.has(i)" @change="toggleChecked(i)">
+              <span>{{ ingredient }}</span>
+            </label>
+            <template v-else>{{ ingredient }}</template>
+          </li>
         </ul>
       </div>
 
@@ -193,6 +222,65 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
   border-radius: 50%;
   border: 1px solid var(--stripe);
   flex: none;
+}
+
+/* Shopping mode: the bullet gives way to a real checkbox and each row
+   grows into a comfortable thumb target — this is the one view of the card
+   that's meant to be poked at repeatedly on a phone in a shop aisle. */
+.mini-list.shopping {
+  gap: 2px;
+}
+
+.mini-list.shopping li::before {
+  content: none;
+}
+
+.mini-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 2px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.mini-check input {
+  appearance: none;
+  margin: 0;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1.5px solid var(--stripe);
+  background: var(--surface);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.mini-check input::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  transform: scale(0);
+  transition: transform 0.12s ease-in-out;
+  background: var(--stripe);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.mini-check input:checked::before {
+  transform: scale(1);
+}
+
+.mini-check input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mini-list li.checked .mini-check span {
+  color: var(--surface-ink-dim);
+  text-decoration: line-through;
 }
 
 .mini-steps {

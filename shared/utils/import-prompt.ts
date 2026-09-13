@@ -45,7 +45,7 @@ export function buildImportPrompt(lang: PromptLang = 'en'): string {
   if (lang === 'cs') {
     return `Převádíš recept do souboru JSON pro import do Recepikarteru, osobní aplikace na kartičky s recepty.
 
-Za tyto instrukce vložím recept (text zkopírovaný z webu, nebo adresu URL). Převeď ho do JSON, který přesně odpovídá schématu níže. Odpověz pouze tím JSON — bez komentáře a bez markdownového bloku s kódem.
+Za tyto instrukce vložím recept (text zkopírovaný z webu, nebo adresu URL). Převeď ho do JSON, který přesně odpovídá schématu níže. Výsledek poskytni jako soubor ke stažení pojmenovaný podle receptu — hodnota "name" plus ".json", např. "Bramboračka.json" — ne jako text v odpovědi. Pouze pokud soubory vytvářet neumíš, odpověz samotným JSON — bez komentáře a bez markdownového bloku s kódem.
 
 TVAR VÝSTUPU
 
@@ -82,7 +82,7 @@ Tady je recept k převedení:
 
   return `You are converting a recipe into a JSON file for import into Recepikarter, a personal recipe-card app.
 
-I will paste a recipe (text copied from a website, or a URL) after these instructions. Convert it into JSON that follows the schema below exactly. Reply with the JSON only — no commentary, no markdown code fences.
+I will paste a recipe (text copied from a website, or a URL) after these instructions. Convert it into JSON that follows the schema below exactly. Provide the result as a downloadable file named after the recipe — the "name" value plus ".json", e.g. "Bramboračka.json" — not as text in the reply. Only if you cannot create files, reply with the JSON alone — no commentary, no markdown code fences.
 
 OUTPUT SHAPE
 
