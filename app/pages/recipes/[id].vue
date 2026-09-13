@@ -124,8 +124,12 @@ async function onSave() {
     }
     if (isNew.value) {
       const created = await createRecipe(payload)
-      clearDraft()
-      showSaved(() => navigateTo(`/recipes/${created.id}`))
+      // The form stays live (and the draft watcher armed) while the
+      // checkmark shows, so clear the draft right before leaving, not now.
+      showSaved(() => {
+        clearDraft()
+        return navigateTo(`/recipes/${created.id}`)
+      })
     } else {
       const updated = await updateRecipe(recipeId.value, payload)
       const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, lastExportedAt: _lastExportedAt, ...rest } =
