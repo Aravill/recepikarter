@@ -15,6 +15,12 @@ export function useRecipes() {
     $fetch<Recipe>(`/api/recipes/${id}`, { method: 'PUT', body: input, headers })
   const deleteRecipe = (id: number) => $fetch(`/api/recipes/${id}`, { method: 'DELETE', headers })
   const markExported = (id: number) => $fetch<Recipe>(`/api/recipes/${id}/export`, { method: 'POST', headers })
+  const uploadPhoto = (id: number, file: File) => {
+    const body = new FormData()
+    body.append('photo', file)
+    return $fetch<Recipe>(`/api/recipes/${id}/photo`, { method: 'POST', body, headers })
+  }
+  const deletePhoto = (id: number) => $fetch(`/api/recipes/${id}/photo`, { method: 'DELETE', headers })
   const importRecipes = (recipes: unknown[]) =>
     $fetch<{ created: Recipe[]; skipped: { name: string; reason: string }[] }>('/api/recipes/import', {
       method: 'POST',
@@ -22,5 +28,16 @@ export function useRecipes() {
       headers,
     })
 
-  return { listRecipes, listTags, getRecipeById, createRecipe, updateRecipe, deleteRecipe, markExported, importRecipes }
+  return {
+    listRecipes,
+    listTags,
+    getRecipeById,
+    createRecipe,
+    updateRecipe,
+    deleteRecipe,
+    markExported,
+    uploadPhoto,
+    deletePhoto,
+    importRecipes,
+  }
 }
