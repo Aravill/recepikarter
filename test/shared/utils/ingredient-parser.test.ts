@@ -76,6 +76,18 @@ describe('parseIngredientLine', () => {
   it('parses a simple fraction', () => {
     expect(parseIngredientLine('1/2 kg mouky').baseAmount).toBe(500)
   })
+
+  it('recognises less common Czech case endings', () => {
+    expect(parseIngredientLine('2 kilogramech brambor').unit).toBe('kg')
+    expect(parseIngredientLine('3 lžícemi medu').unit).toBe('lžíce')
+  })
+
+  it('falls back to the whole remainder as the name when nothing follows the unit', () => {
+    const parsed = parseIngredientLine('400 g')
+    expect(parsed.name).toBe('g')
+    expect(parsed.unit).toBeNull()
+    expect(parsed.kind).toBe('count')
+  })
 })
 
 describe('normalizeIngredientName', () => {
@@ -133,7 +145,7 @@ describe('aggregateIngredients', () => {
     ])
     expect(result).toEqual([
       {
-        key: 'count:citron:',
+        key: 'text:citron:',
         name: 'citron',
         kind: 'count',
         displayQuantity: '3 citron',
@@ -143,6 +155,17 @@ describe('aggregateIngredients', () => {
         ],
       },
     ])
+  })
+
+  it('combines the same ingredient whether or not it carries an amount, without a false total', () => {
+    const result = aggregateIngredients([
+      { id: 1, name: 'A', ingredients: ['sůl'] },
+      { id: 2, name: 'B', ingredients: ['1 sůl'] },
+    ])
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({ name: 'sůl', kind: 'unknown', displayQuantity: null })
+    expect(result[0]!.sources).toHaveLength(2)
   })
 
   it('never numerically combines unparsed lines, but groups identical text', () => {
