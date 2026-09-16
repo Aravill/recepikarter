@@ -29,27 +29,18 @@ const VIEW_MODES: { mode: ViewMode; glyph: string; label: string }[] = [
 // the cards/carousel view already has its own unrelated single-recipe
 // shopping mode (see CardStack.vue) — so switching to "cards" drops it.
 const selectMode = ref(false)
-const selected = ref(new Set<number>())
+const { items: selected, toggle: onRecipeTileClick, clear: clearSelected } = useToggleSet<number>()
 
 watch(viewMode, (mode) => {
   if (mode === 'cards') {
     selectMode.value = false
-    selected.value = new Set()
+    clearSelected()
   }
 })
 
 function toggleSelectMode() {
   selectMode.value = !selectMode.value
-  if (!selectMode.value) selected.value = new Set()
-}
-
-function onRecipeTileClick(id: number, e: MouseEvent) {
-  if (!selectMode.value) return
-  e.preventDefault()
-  const next = new Set(selected.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  selected.value = next
+  if (!selectMode.value) clearSelected()
 }
 
 function goToShoppingList() {
@@ -440,67 +431,75 @@ async function copyImportPrompt(lang: PromptLang) {
     <div v-else-if="viewMode === 'gallery'" class="gallery">
       <NuxtLink
         v-for="recipe in sorted"
-        v-slot="{ href, navigate }"
         :key="recipe.id"
         :to="`/recipes/${recipe.id}`"
-        custom
+        class="tile"
+        :class="{ 'no-photo': !recipe.photoFile, selected: selectMode && selected.has(recipe.id) }"
+        :style="{ '--edge': `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
       >
-        <a
-          :href="href"
-          class="tile"
-          :class="{ 'no-photo': !recipe.photoFile, selected: selectMode && selected.has(recipe.id) }"
-          :style="{ '--edge': `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
-          @click="selectMode ? onRecipeTileClick(recipe.id, $event) : navigate($event)"
+        <!-- A plain NuxtLink keeps its default hover/visibility route
+        prefetch (lost if the link itself is put in `custom` mode); a
+        click-catching overlay only rendered in select mode intercepts the
+        click instead. preventDefault is required, not just stopPropagation:
+        a native <a href> navigates on its own default action regardless of
+        whether any 'click' listener actually ran, so only preventDefault
+        (not stopPropagation) suppresses it — confirmed the hard way in
+        browser testing, where a stopPropagation-only version still
+        navigated. stopPropagation is kept anyway so vue-router's own click
+        handler doesn't do pointless work once defaultPrevented is set. -->
+        <div
+          v-if="selectMode"
+          class="select-overlay"
+          @click.stop.prevent="onRecipeTileClick(recipe.id)"
         >
-          <span v-if="selectMode" class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
-          <img v-if="recipe.photoFile" :src="recipePhotoUrl(recipe, 'thumb')!" alt="" class="tile-photo" loading="lazy">
-          <span class="tile-cap">
-            <span class="tile-eyebrow">{{ CATEGORY_LABELS[recipe.category] }}</span>
-            <span class="tile-name">{{ recipe.name }}</span>
-            <span class="tile-meta">
-              {{ recipe.cookTime }} min<template v-if="recipe.servings">
-                · {{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</template>
-            </span>
-            <span v-if="!recipe.photoFile" class="tile-add">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
-                <circle cx="12" cy="13" r="3.2" />
-              </svg>
-              přidat fotku
-            </span>
+          <span class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
+        </div>
+        <img v-if="recipe.photoFile" :src="recipePhotoUrl(recipe, 'thumb')!" alt="" class="tile-photo" loading="lazy">
+        <span class="tile-cap">
+          <span class="tile-eyebrow">{{ CATEGORY_LABELS[recipe.category] }}</span>
+          <span class="tile-name">{{ recipe.name }}</span>
+          <span class="tile-meta">
+            {{ recipe.cookTime }} min<template v-if="recipe.servings">
+              · {{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</template>
           </span>
-        </a>
+          <span v-if="!recipe.photoFile" class="tile-add">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+              <circle cx="12" cy="13" r="3.2" />
+            </svg>
+            přidat fotku
+          </span>
+        </span>
       </NuxtLink>
     </div>
 
-    <div v-else class="list">
+    <div v-else class="list" :class="{ 'select-mode': selectMode }">
       <NuxtLink
         v-for="recipe in sorted"
-        v-slot="{ href, navigate }"
         :key="recipe.id"
         :to="`/recipes/${recipe.id}`"
-        custom
+        class="row"
+        :class="{ selected: selectMode && selected.has(recipe.id) }"
+        :style="{ borderLeftColor: `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
       >
-        <a
-          :href="href"
-          class="row"
-          :class="{ selected: selectMode && selected.has(recipe.id) }"
-          :style="{ borderLeftColor: `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
-          @click="selectMode ? onRecipeTileClick(recipe.id, $event) : navigate($event)"
+        <div
+          v-if="selectMode"
+          class="select-overlay"
+          @click.stop.prevent="onRecipeTileClick(recipe.id)"
         >
-          <span v-if="selectMode" class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
-          <div class="row-main">
-            <div class="row-name">{{ recipe.name }}</div>
-            <div class="row-meta">
-              <span>{{ CATEGORY_LABELS[recipe.category] }}</span>
-              <span>·</span>
-              <span>{{ recipe.cookTime }} min</span>
-              <span v-if="recipe.servings">·</span>
-              <span v-if="recipe.servings">{{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</span>
-            </div>
+          <span class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
+        </div>
+        <div class="row-main">
+          <div class="row-name">{{ recipe.name }}</div>
+          <div class="row-meta">
+            <span>{{ CATEGORY_LABELS[recipe.category] }}</span>
+            <span>·</span>
+            <span>{{ recipe.cookTime }} min</span>
+            <span v-if="recipe.servings">·</span>
+            <span v-if="recipe.servings">{{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</span>
           </div>
-          <span class="row-chevron">›</span>
-        </a>
+        </div>
+        <span class="row-chevron">›</span>
       </NuxtLink>
     </div>
 
@@ -857,6 +856,7 @@ async function copyImportPrompt(lang: PromptLang) {
 }
 
 .row {
+  position: relative;
   background: var(--surface);
   border-radius: 14px;
   padding: 13px 14px 13px 16px;
@@ -872,8 +872,38 @@ async function copyImportPrompt(lang: PromptLang) {
   outline-offset: -2px;
 }
 
-/* Select-mode checkbox: purely visual, the whole tile/row's click handler
-   (onRecipeTileClick) is what actually toggles selection. */
+/* Select mode makes the checkbox an overlay (see .select-overlay) rather
+   than a real flex child, so the row text needs to make room for it by
+   hand. */
+.list.select-mode .row-main {
+  margin-left: 30px;
+}
+
+/* Covers the whole tile/row so any click on it toggles selection —
+   stopPropagation (not preventDefault) is what keeps the NuxtLink under it
+   from navigating; see onRecipeTileClick's usage in the template. Kept as
+   its own element instead of a handler on the NuxtLink itself so the link
+   stays a plain, non-`custom` NuxtLink and keeps Nuxt's automatic
+   hover/visibility route prefetching outside select mode. */
+.select-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: pointer;
+  display: flex;
+}
+
+.tile .select-overlay {
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 8px;
+}
+
+.row .select-overlay {
+  align-items: center;
+  padding-left: 16px;
+}
+
 .select-check {
   flex: none;
   width: 18px;
@@ -881,11 +911,12 @@ async function copyImportPrompt(lang: PromptLang) {
   border-radius: 5px;
   border: 1.5px solid var(--accent);
   background: var(--surface);
-}
-
-.row .select-check {
   display: grid;
   place-content: center;
+}
+
+.tile .select-check {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .select-check.checked {
@@ -998,16 +1029,6 @@ async function copyImportPrompt(lang: PromptLang) {
 .tile.selected {
   outline: 3px solid var(--accent);
   outline-offset: -3px;
-}
-
-.tile .select-check {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-  display: grid;
-  place-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .tile.no-photo {
