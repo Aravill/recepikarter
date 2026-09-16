@@ -24,6 +24,38 @@ const VIEW_MODES: { mode: ViewMode; glyph: string; label: string }[] = [
   { mode: 'list', glyph: '☰', label: 'Zobrazit seznam' },
   { mode: 'gallery', glyph: '▦', label: 'Zobrazit galerii' },
 ]
+// Picking several recipes to combine into one shopping list (see
+// app/pages/shopping-list.vue). Only meaningful in the gallery/list views —
+// the cards/carousel view already has its own unrelated single-recipe
+// shopping mode (see CardStack.vue) — so switching to "cards" drops it.
+const selectMode = ref(false)
+const selected = ref(new Set<number>())
+
+watch(viewMode, (mode) => {
+  if (mode === 'cards') {
+    selectMode.value = false
+    selected.value = new Set()
+  }
+})
+
+function toggleSelectMode() {
+  selectMode.value = !selectMode.value
+  if (!selectMode.value) selected.value = new Set()
+}
+
+function onRecipeTileClick(id: number, e: MouseEvent) {
+  if (!selectMode.value) return
+  e.preventDefault()
+  const next = new Set(selected.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selected.value = next
+}
+
+function goToShoppingList() {
+  navigateTo(`/shopping-list?ids=${[...selected.value].join(',')}`)
+}
+
 const categoryMenuOpen = ref(false)
 const categoryMenuRef = ref<HTMLElement | null>(null)
 const difficultyMenuOpen = ref(false)
@@ -365,6 +397,17 @@ async function copyImportPrompt(lang: PromptLang) {
           </button>
         </div>
         <button
+          v-if="viewMode !== 'cards'"
+          type="button"
+          class="view-toggle"
+          :class="{ active: selectMode }"
+          aria-label="Vybrat recepty pro nákupní seznam"
+          :aria-pressed="selectMode"
+          @click="toggleSelectMode"
+        >
+          🛒
+        </button>
+        <button
           type="button"
           class="view-toggle"
           aria-label="Nahrát recept z JSON"
@@ -397,50 +440,67 @@ async function copyImportPrompt(lang: PromptLang) {
     <div v-else-if="viewMode === 'gallery'" class="gallery">
       <NuxtLink
         v-for="recipe in sorted"
+        v-slot="{ href, navigate }"
         :key="recipe.id"
         :to="`/recipes/${recipe.id}`"
-        class="tile"
-        :class="{ 'no-photo': !recipe.photoFile }"
-        :style="{ '--edge': `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
+        custom
       >
-        <img v-if="recipe.photoFile" :src="recipePhotoUrl(recipe, 'thumb')!" alt="" class="tile-photo" loading="lazy">
-        <span class="tile-cap">
-          <span class="tile-eyebrow">{{ CATEGORY_LABELS[recipe.category] }}</span>
-          <span class="tile-name">{{ recipe.name }}</span>
-          <span class="tile-meta">
-            {{ recipe.cookTime }} min<template v-if="recipe.servings">
-              · {{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</template>
+        <a
+          :href="href"
+          class="tile"
+          :class="{ 'no-photo': !recipe.photoFile, selected: selectMode && selected.has(recipe.id) }"
+          :style="{ '--edge': `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
+          @click="selectMode ? onRecipeTileClick(recipe.id, $event) : navigate($event)"
+        >
+          <span v-if="selectMode" class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
+          <img v-if="recipe.photoFile" :src="recipePhotoUrl(recipe, 'thumb')!" alt="" class="tile-photo" loading="lazy">
+          <span class="tile-cap">
+            <span class="tile-eyebrow">{{ CATEGORY_LABELS[recipe.category] }}</span>
+            <span class="tile-name">{{ recipe.name }}</span>
+            <span class="tile-meta">
+              {{ recipe.cookTime }} min<template v-if="recipe.servings">
+                · {{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</template>
+            </span>
+            <span v-if="!recipe.photoFile" class="tile-add">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+                <circle cx="12" cy="13" r="3.2" />
+              </svg>
+              přidat fotku
+            </span>
           </span>
-          <span v-if="!recipe.photoFile" class="tile-add">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
-              <circle cx="12" cy="13" r="3.2" />
-            </svg>
-            přidat fotku
-          </span>
-        </span>
+        </a>
       </NuxtLink>
     </div>
 
     <div v-else class="list">
       <NuxtLink
         v-for="recipe in sorted"
+        v-slot="{ href, navigate }"
         :key="recipe.id"
         :to="`/recipes/${recipe.id}`"
-        class="row"
-        :style="{ borderLeftColor: `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
+        custom
       >
-        <div class="row-main">
-          <div class="row-name">{{ recipe.name }}</div>
-          <div class="row-meta">
-            <span>{{ CATEGORY_LABELS[recipe.category] }}</span>
-            <span>·</span>
-            <span>{{ recipe.cookTime }} min</span>
-            <span v-if="recipe.servings">·</span>
-            <span v-if="recipe.servings">{{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</span>
+        <a
+          :href="href"
+          class="row"
+          :class="{ selected: selectMode && selected.has(recipe.id) }"
+          :style="{ borderLeftColor: `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
+          @click="selectMode ? onRecipeTileClick(recipe.id, $event) : navigate($event)"
+        >
+          <span v-if="selectMode" class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
+          <div class="row-main">
+            <div class="row-name">{{ recipe.name }}</div>
+            <div class="row-meta">
+              <span>{{ CATEGORY_LABELS[recipe.category] }}</span>
+              <span>·</span>
+              <span>{{ recipe.cookTime }} min</span>
+              <span v-if="recipe.servings">·</span>
+              <span v-if="recipe.servings">{{ recipe.servings }} {{ recipe.servings === '1' ? 'porce' : 'porcí' }}</span>
+            </div>
           </div>
-        </div>
-        <span class="row-chevron">›</span>
+          <span class="row-chevron">›</span>
+        </a>
       </NuxtLink>
     </div>
 
@@ -478,6 +538,13 @@ async function copyImportPrompt(lang: PromptLang) {
     </div>
 
     <InfoToast v-if="promptToast" :message="promptToast" @dismiss="dismissPromptToast" />
+
+    <div v-if="selectMode && selected.size" class="selection-bar">
+      <span>{{ selected.size }} vybráno</span>
+      <button type="button" class="selection-bar-btn" @click="goToShoppingList">
+        🛒 Vytvořit nákupní seznam
+      </button>
+    </div>
   </div>
 </template>
 
@@ -718,6 +785,11 @@ async function copyImportPrompt(lang: PromptLang) {
   justify-content: center;
 }
 
+.view-toggle.active {
+  border-color: var(--accent);
+  background: rgba(184, 80, 42, 0.16);
+}
+
 .view-modes {
   display: flex;
   border: 1px solid var(--line);
@@ -793,6 +865,39 @@ async function copyImportPrompt(lang: PromptLang) {
   gap: 12px;
   border-left: 4px solid var(--medium);
   text-decoration: none;
+}
+
+.row.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Select-mode checkbox: purely visual, the whole tile/row's click handler
+   (onRecipeTileClick) is what actually toggles selection. */
+.select-check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--accent);
+  background: var(--surface);
+}
+
+.row .select-check {
+  display: grid;
+  place-content: center;
+}
+
+.select-check.checked {
+  background: var(--accent);
+}
+
+.select-check.checked::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  background: #fdf9f2;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
 }
 
 .row-main {
@@ -888,6 +993,21 @@ async function copyImportPrompt(lang: PromptLang) {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 11px;
   color: rgba(253, 249, 242, 0.78);
+}
+
+.tile.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.tile .select-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .tile.no-photo {
@@ -994,5 +1114,37 @@ async function copyImportPrompt(lang: PromptLang) {
   text-transform: uppercase;
   color: var(--surface-ink-dim);
   padding: 6px 10px 4px;
+}
+
+.selection-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  background: var(--surface);
+  color: var(--surface-ink);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.5);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.selection-bar-btn {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fdf9f2;
+  cursor: pointer;
+  white-space: nowrap;
 }
 </style>
