@@ -14,7 +14,9 @@ const ids = computed<number[]>(() => {
   const str = Array.isArray(raw) ? raw.join(',') : (raw ?? '')
   return str
     .split(',')
-    .map((s) => Number(s.trim()))
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(Number)
     .filter((n) => Number.isFinite(n))
 })
 
@@ -34,14 +36,7 @@ function lineText(item: AggregatedIngredient): string {
 
 // Ticking off items is exactly as ephemeral as the single-recipe shopping
 // mode in RecipeCard.vue: navigating away from this page forgets it.
-const checked = ref(new Set<string>())
-
-function toggleChecked(key: string) {
-  const next = new Set(checked.value)
-  if (next.has(key)) next.delete(key)
-  else next.add(key)
-  checked.value = next
-}
+const { items: checked, toggle: toggleChecked } = useToggleSet<string>()
 </script>
 
 <template>
