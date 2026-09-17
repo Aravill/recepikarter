@@ -25,21 +25,14 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
 // Which ingredients (by index into `ingredients`) are ticked off. Deliberately
 // not persisted anywhere: a shopping list is done once the trip is, so
 // leaving shopping mode simply forgets it.
-const checked = ref(new Set<number>())
+const { items: checked, toggle: toggleChecked, clear: clearChecked } = useToggleSet<number>()
 
 watch(
   () => props.shopping,
   (shopping) => {
-    if (!shopping) checked.value = new Set()
+    if (!shopping) clearChecked()
   },
 )
-
-function toggleChecked(i: number) {
-  const next = new Set(checked.value)
-  if (next.has(i)) next.delete(i)
-  else next.add(i)
-  checked.value = next
-}
 </script>
 
 <template>

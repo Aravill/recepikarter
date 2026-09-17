@@ -24,6 +24,29 @@ const VIEW_MODES: { mode: ViewMode; glyph: string; label: string }[] = [
   { mode: 'list', glyph: '☰', label: 'Zobrazit seznam' },
   { mode: 'gallery', glyph: '▦', label: 'Zobrazit galerii' },
 ]
+// Picking several recipes to combine into one shopping list (see
+// app/pages/shopping-list.vue). Only meaningful in the gallery/list views —
+// the cards/carousel view already has its own unrelated single-recipe
+// shopping mode (see CardStack.vue) — so switching to "cards" drops it.
+const selectMode = ref(false)
+const { items: selected, toggle: onRecipeTileClick, clear: clearSelected } = useToggleSet<number>()
+
+watch(viewMode, (mode) => {
+  if (mode === 'cards') {
+    selectMode.value = false
+    clearSelected()
+  }
+})
+
+function toggleSelectMode() {
+  selectMode.value = !selectMode.value
+  if (!selectMode.value) clearSelected()
+}
+
+function goToShoppingList() {
+  navigateTo(`/shopping-list?ids=${[...selected.value].join(',')}`)
+}
+
 const categoryMenuOpen = ref(false)
 const categoryMenuRef = ref<HTMLElement | null>(null)
 const difficultyMenuOpen = ref(false)
@@ -365,6 +388,17 @@ async function copyImportPrompt(lang: PromptLang) {
           </button>
         </div>
         <button
+          v-if="viewMode !== 'cards'"
+          type="button"
+          class="view-toggle"
+          :class="{ active: selectMode }"
+          aria-label="Vybrat recepty pro nákupní seznam"
+          :aria-pressed="selectMode"
+          @click="toggleSelectMode"
+        >
+          🛒
+        </button>
+        <button
           type="button"
           class="view-toggle"
           aria-label="Nahrát recept z JSON"
@@ -400,9 +434,26 @@ async function copyImportPrompt(lang: PromptLang) {
         :key="recipe.id"
         :to="`/recipes/${recipe.id}`"
         class="tile"
-        :class="{ 'no-photo': !recipe.photoFile }"
+        :class="{ 'no-photo': !recipe.photoFile, selected: selectMode && selected.has(recipe.id) }"
         :style="{ '--edge': `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
       >
+        <!-- A plain NuxtLink keeps its default hover/visibility route
+        prefetch (lost if the link itself is put in `custom` mode); a
+        click-catching overlay only rendered in select mode intercepts the
+        click instead. preventDefault is required, not just stopPropagation:
+        a native <a href> navigates on its own default action regardless of
+        whether any 'click' listener actually ran, so only preventDefault
+        (not stopPropagation) suppresses it — confirmed the hard way in
+        browser testing, where a stopPropagation-only version still
+        navigated. stopPropagation is kept anyway so vue-router's own click
+        handler doesn't do pointless work once defaultPrevented is set. -->
+        <div
+          v-if="selectMode"
+          class="select-overlay"
+          @click.stop.prevent="onRecipeTileClick(recipe.id)"
+        >
+          <span class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
+        </div>
         <img v-if="recipe.photoFile" :src="recipePhotoUrl(recipe, 'thumb')!" alt="" class="tile-photo" loading="lazy">
         <span class="tile-cap">
           <span class="tile-eyebrow">{{ CATEGORY_LABELS[recipe.category] }}</span>
@@ -422,14 +473,22 @@ async function copyImportPrompt(lang: PromptLang) {
       </NuxtLink>
     </div>
 
-    <div v-else class="list">
+    <div v-else class="list" :class="{ 'select-mode': selectMode }">
       <NuxtLink
         v-for="recipe in sorted"
         :key="recipe.id"
         :to="`/recipes/${recipe.id}`"
         class="row"
+        :class="{ selected: selectMode && selected.has(recipe.id) }"
         :style="{ borderLeftColor: `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
       >
+        <div
+          v-if="selectMode"
+          class="select-overlay"
+          @click.stop.prevent="onRecipeTileClick(recipe.id)"
+        >
+          <span class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
+        </div>
         <div class="row-main">
           <div class="row-name">{{ recipe.name }}</div>
           <div class="row-meta">
@@ -478,6 +537,13 @@ async function copyImportPrompt(lang: PromptLang) {
     </div>
 
     <InfoToast v-if="promptToast" :message="promptToast" @dismiss="dismissPromptToast" />
+
+    <div v-if="selectMode && selected.size" class="selection-bar">
+      <span>{{ selected.size }} vybráno</span>
+      <button type="button" class="selection-bar-btn" @click="goToShoppingList">
+        🛒 Vytvořit nákupní seznam
+      </button>
+    </div>
   </div>
 </template>
 
@@ -718,6 +784,11 @@ async function copyImportPrompt(lang: PromptLang) {
   justify-content: center;
 }
 
+.view-toggle.active {
+  border-color: var(--accent);
+  background: rgba(184, 80, 42, 0.16);
+}
+
 .view-modes {
   display: flex;
   border: 1px solid var(--line);
@@ -785,6 +856,7 @@ async function copyImportPrompt(lang: PromptLang) {
 }
 
 .row {
+  position: relative;
   background: var(--surface);
   border-radius: 14px;
   padding: 13px 14px 13px 16px;
@@ -793,6 +865,70 @@ async function copyImportPrompt(lang: PromptLang) {
   gap: 12px;
   border-left: 4px solid var(--medium);
   text-decoration: none;
+}
+
+.row.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Select mode makes the checkbox an overlay (see .select-overlay) rather
+   than a real flex child, so the row text needs to make room for it by
+   hand. */
+.list.select-mode .row-main {
+  margin-left: 30px;
+}
+
+/* Covers the whole tile/row so any click on it toggles selection —
+   stopPropagation (not preventDefault) is what keeps the NuxtLink under it
+   from navigating; see onRecipeTileClick's usage in the template. Kept as
+   its own element instead of a handler on the NuxtLink itself so the link
+   stays a plain, non-`custom` NuxtLink and keeps Nuxt's automatic
+   hover/visibility route prefetching outside select mode. */
+.select-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: pointer;
+  display: flex;
+}
+
+.tile .select-overlay {
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 8px;
+}
+
+.row .select-overlay {
+  align-items: center;
+  padding-left: 16px;
+}
+
+.select-check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--accent);
+  background: var(--surface);
+  display: grid;
+  place-content: center;
+}
+
+.tile .select-check {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.select-check.checked {
+  background: var(--accent);
+}
+
+.select-check.checked::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  background: #fdf9f2;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
 }
 
 .row-main {
@@ -888,6 +1024,11 @@ async function copyImportPrompt(lang: PromptLang) {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 11px;
   color: rgba(253, 249, 242, 0.78);
+}
+
+.tile.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
 }
 
 .tile.no-photo {
@@ -994,5 +1135,37 @@ async function copyImportPrompt(lang: PromptLang) {
   text-transform: uppercase;
   color: var(--surface-ink-dim);
   padding: 6px 10px 4px;
+}
+
+.selection-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  background: var(--surface);
+  color: var(--surface-ink);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.5);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.selection-bar-btn {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fdf9f2;
+  cursor: pointer;
+  white-space: nowrap;
 }
 </style>
