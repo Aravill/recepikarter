@@ -1,21 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createRecipe,
+  createShoppingList,
   createUser,
   deleteRecipe,
+  deleteShoppingList,
   findRecipeByNormalizedName,
   findUserRowByUsername,
   getRecipe,
+  getShoppingList,
   listRecipes,
+  listShoppingLists,
   listTags,
   listUsers,
   markExported,
+  resetShoppingListItems,
   setRecipePhoto,
+  setShoppingListItemChecked,
   setUserPassword,
   setUserStatus,
   updateRecipe,
+  updateShoppingListMeta,
 } from '../../../server/utils/db'
 import type { RecipeInput } from '../../../shared/types/recipe'
+import type { ShoppingListItem } from '../../../shared/types/shopping-list'
 
 function sampleInput(overrides: Partial<RecipeInput> = {}): RecipeInput {
   return {
@@ -33,7 +41,14 @@ function sampleInput(overrides: Partial<RecipeInput> = {}): RecipeInput {
 
 beforeEach(() => {
   for (const recipe of listRecipes()) deleteRecipe(recipe.id)
+  for (const list of listShoppingLists('michal')) deleteShoppingList(list.id)
 })
+
+function sampleItems(overrides: Partial<ShoppingListItem> = {}): ShoppingListItem[] {
+  return [
+    { key: 'mass:mouky', name: 'mouky', kind: 'mass', displayQuantity: '400 g', sources: [], checked: false, ...overrides },
+  ]
+}
 
 describe('recipes db', () => {
   it('creates and fetches a recipe by id', () => {
@@ -169,5 +184,86 @@ describe('users db', () => {
     const row = findUserRowByUsername('novak-3')
     expect(row?.password_hash).toBe('new-hash')
     expect(row?.must_change_password).toBe(0)
+  })
+})
+
+describe('shopping lists db', () => {
+  it('creates a list, unshared and unchecked by default', () => {
+    const list = createShoppingList('Víkendový nákup', 'michal', sampleItems())
+
+    expect(list.name).toBe('Víkendový nákup')
+    expect(list.ownerUsername).toBe('michal')
+    expect(list.shared).toBe(false)
+    expect(list.items).toEqual(sampleItems())
+    expect(getShoppingList(list.id)).toEqual(list)
+  })
+
+  it('lists a user\'s own lists plus every shared list, but not someone else\'s private list', () => {
+    const own = createShoppingList('Moje', 'michal', sampleItems())
+    const othersPrivate = createShoppingList('Cizí soukromý', 'petr', sampleItems())
+    const othersShared = createShoppingList('Cizí sdílený', 'petr', sampleItems())
+    updateShoppingListMeta(othersShared.id, { shared: true })
+
+    const seen = listShoppingLists('michal').map((l) => l.id)
+    expect(seen).toContain(own.id)
+    expect(seen).toContain(othersShared.id)
+    expect(seen).not.toContain(othersPrivate.id)
+
+    deleteShoppingList(othersPrivate.id)
+  })
+
+  it('renames and toggles the shared flag independently', () => {
+    const list = createShoppingList('Původní název', 'michal', sampleItems())
+
+    const renamed = updateShoppingListMeta(list.id, { name: 'Nový název' })
+    expect(renamed?.name).toBe('Nový název')
+    expect(renamed?.shared).toBe(false)
+
+    const shared = updateShoppingListMeta(list.id, { shared: true })
+    expect(shared?.name).toBe('Nový název')
+    expect(shared?.shared).toBe(true)
+  })
+
+  it('returns undefined updating metadata on a list that does not exist', () => {
+    expect(updateShoppingListMeta(999999, { name: 'x' })).toBeUndefined()
+  })
+
+  it('deletes a list', () => {
+    const list = createShoppingList('Ke smazání', 'michal', sampleItems())
+
+    expect(deleteShoppingList(list.id)).toBe(true)
+    expect(getShoppingList(list.id)).toBeUndefined()
+  })
+
+  it('returns false deleting a list that does not exist', () => {
+    expect(deleteShoppingList(999999)).toBe(false)
+  })
+
+  it('unticks every item on reset without touching the rest of the snapshot', () => {
+    const list = createShoppingList('Nákup', 'michal', [
+      ...sampleItems({ key: 'a', checked: true }),
+      ...sampleItems({ key: 'b', name: 'vejce', checked: true }),
+    ])
+
+    const reset = resetShoppingListItems(list.id)
+
+    expect(reset?.items.every((i) => !i.checked)).toBe(true)
+    expect(reset?.items.map((i) => i.name)).toEqual(['mouky', 'vejce'])
+  })
+
+  it('toggles a single item by key without touching the others', () => {
+    const list = createShoppingList('Nákup', 'michal', [
+      ...sampleItems({ key: 'a' }),
+      ...sampleItems({ key: 'b', name: 'vejce' }),
+    ])
+
+    const updated = setShoppingListItemChecked(list.id, 'a', true)
+
+    expect(updated?.items.find((i) => i.key === 'a')?.checked).toBe(true)
+    expect(updated?.items.find((i) => i.key === 'b')?.checked).toBe(false)
+  })
+
+  it('returns undefined toggling an item on a list that does not exist', () => {
+    expect(setShoppingListItemChecked(999999, 'a', true)).toBeUndefined()
   })
 })
