@@ -1,5 +1,4 @@
-import { MEAL_TYPES } from '#shared/types/meal-plan'
-import type { MealPlan, MealPlanSlot } from '#shared/types/meal-plan'
+import type { MealPlan, MealPlanSlot, MealType } from '#shared/types/meal-plan'
 import type { Recipe } from '#shared/types/recipe'
 
 // A meal plan is a household planning tool, not an events calendar — cap the
@@ -88,6 +87,6 @@ export function mealPlanColorIndex(recipeId: number): number {
   return ((recipeId % MEAL_PLAN_PALETTE_SIZE) + MEAL_PLAN_PALETTE_SIZE) % MEAL_PLAN_PALETTE_SIZE
 }
 
-export function mealPlanSlotKey(date: string, mealType: (typeof MEAL_TYPES)[number]): string {
+export function mealPlanSlotKey(date: string, mealType: MealType): string {
   return `${date}|${mealType}`
 }
