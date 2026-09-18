@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Recipe } from '#shared/types/recipe'
 
-const props = defineProps<{ recipes: Recipe[]; selectedIds: Set<number> }>()
+const props = defineProps<{ recipes: Recipe[]; selectedIds: number[] }>()
 const emit = defineEmits<{ toggleSelect: [id: number] }>()
 
 const { markExported } = useRecipes()
@@ -332,16 +332,16 @@ function onKeydown(e: KeyboardEvent) {
             zIndex: 10 - Math.abs(slot.offset),
           }"
         >
-          <FlipCard v-if="slot.offset === 0" :ref="setFlipCardRef" :recipe="slot.recipe" :side="side" />
-          <RecipeCard v-else :recipe="slot.recipe" side="front" />
+          <FlipCard v-if="slot.offset === 0" :ref="setFlipCardRef" :recipe="slot.recipe" :side="side" :selected="selectedIds.includes(slot.recipe.id)" />
+          <RecipeCard v-else :recipe="slot.recipe" side="front" :selected="selectedIds.includes(slot.recipe.id)" />
 
           <div v-if="slot.offset === 0" class="card-actions" :class="{ shown: actionsShown }">
             <button class="card-action-btn" aria-label="Upravit recept" @click.stop="onEdit">✎</button>
             <button
               class="card-action-btn"
-              :class="{ active: selectedIds.has(slot.recipe.id) }"
-              :aria-label="selectedIds.has(slot.recipe.id) ? 'Odebrat z nákupního seznamu' : 'Přidat do nákupního seznamu'"
-              :aria-pressed="selectedIds.has(slot.recipe.id)"
+              :class="{ active: selectedIds.includes(slot.recipe.id) }"
+              :aria-label="selectedIds.includes(slot.recipe.id) ? 'Odebrat z nákupního seznamu' : 'Přidat do nákupního seznamu'"
+              :aria-pressed="selectedIds.includes(slot.recipe.id)"
               @click.stop="emit('toggleSelect', slot.recipe.id)"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

@@ -6,8 +6,11 @@ const props = withDefaults(
   defineProps<{
     recipe: Recipe | RecipeInput
     side?: 'front' | 'back'
+    // Whether this recipe is in the shopping cart (see useCart.ts) —
+    // purely a visual ring around the card, independent of `side`.
+    selected?: boolean
   }>(),
-  { side: 'front' },
+  { side: 'front', selected: false },
 )
 
 const stripe = computed(() => difficultyColor(props.recipe.cookTimeDifficulty))
@@ -20,7 +23,7 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
 </script>
 
 <template>
-  <div class="card-preview" :style="{ '--stripe': stripe }">
+  <div class="card-preview" :class="{ selected }" :style="{ '--stripe': stripe }">
     <div class="mini-stripe" />
 
     <div v-if="side === 'front'" class="mini-body">
@@ -84,6 +87,14 @@ const author = computed(() => ('author' in props.recipe ? props.recipe.author : 
   box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
+}
+
+/* Same ring language as a selected gallery tile/list row (see
+   app/pages/index.vue) — sits outside the card's own drop shadow instead of
+   clipping into the printed-card face. */
+.card-preview.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .mini-stripe {

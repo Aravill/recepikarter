@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import type { Recipe, RecipeInput } from '#shared/types/recipe'
 
-const props = defineProps<{
-  recipe: Recipe | RecipeInput
-  side: 'front' | 'back'
-}>()
+const props = withDefaults(
+  defineProps<{
+    recipe: Recipe | RecipeInput
+    side: 'front' | 'back'
+    // Passed through to both faces — see RecipeCard.
+    selected?: boolean
+  }>(),
+  { selected: false },
+)
 
 // The flip is modeled as one phase instead of `flipped` + `flipping`
 // booleans. The two rest phases never rely on `rotateY(180deg)` +
@@ -160,8 +165,8 @@ function onFlipInnerTransitionEnd(e: TransitionEvent) {
 <template>
   <div class="flip-card" :class="{ 'has-3d': has3d }">
     <div class="flip-inner" :class="{ rotated, 'has-3d': has3d, 'no-transition': noTransition }" @transitionend="onFlipInnerTransitionEnd">
-      <RecipeCard ref="frontFaceRef" class="face face-front" :class="{ 'force-hidden': atRestBack }" :recipe="recipe" side="front" />
-      <RecipeCard ref="backFaceRef" class="face face-back" :class="{ 'force-flat': atRestBack }" :recipe="recipe" side="back" />
+      <RecipeCard ref="frontFaceRef" class="face face-front" :class="{ 'force-hidden': atRestBack }" :recipe="recipe" side="front" :selected="selected" />
+      <RecipeCard ref="backFaceRef" class="face face-back" :class="{ 'force-flat': atRestBack }" :recipe="recipe" side="back" :selected="selected" />
     </div>
   </div>
 </template>
