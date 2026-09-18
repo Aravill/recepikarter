@@ -34,7 +34,7 @@ const photoUrl = computed(() => ('photoFile' in props.recipe ? recipePhotoUrl(pr
     <div class="mini-stripe" />
 
     <div v-if="side === 'front' && photoUrl" class="photo-overlay" :class="{ hidden: photoHidden }">
-      <img :src="photoUrl" alt="" class="photo-overlay-img" loading="lazy">
+      <img :src="photoUrl" alt="" class="photo-overlay-img">
       <div class="photo-overlay-cap">
         <span class="photo-overlay-eyebrow">{{ CATEGORY_LABELS[recipe.category].toLocaleUpperCase('cs') }}</span>
         <span class="photo-overlay-name">{{ recipe.name }}</span>
@@ -119,6 +119,11 @@ const photoUrl = computed(() => ('photoFile' in props.recipe ? recipePhotoUrl(pr
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  /* Same tone as the card underneath — swapping recipes (e.g. mid-swipe in
+     CardStack) gives the new <img> a moment to decode even from cache, and
+     without an opaque backdrop here that gap let the ingredient list
+     underneath flash through before the photo painted. */
+  background: var(--surface);
   opacity: 1;
   transition: opacity 0.25s ease;
 }
