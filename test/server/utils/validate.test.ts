@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  parseMealPlanInput,
+  parseMealPlanSlotInput,
+  parseMealPlanTrayInput,
   parseRecipeInput,
   parseShoppingListInput,
   parseShoppingListItemPatch,
@@ -126,5 +129,104 @@ describe('parseShoppingListItemPatch', () => {
 
   it('rejects a non-boolean checked value', () => {
     expect(() => parseShoppingListItemPatch({ key: 'a', checked: 'true' })).toThrow('checked must be a boolean')
+  })
+})
+
+describe('parseMealPlanInput', () => {
+  it('parses a valid input, trimming the name', () => {
+    expect(
+      parseMealPlanInput({ name: '  Týden  ', dateStart: '2026-01-05', dateEnd: '2026-01-07', peopleCount: '3' }),
+    ).toEqual({ name: 'Týden', dateStart: '2026-01-05', dateEnd: '2026-01-07', peopleCount: 3 })
+  })
+
+  it('rejects a missing name', () => {
+    expect(() =>
+      parseMealPlanInput({ dateStart: '2026-01-05', dateEnd: '2026-01-07', peopleCount: 3 }),
+    ).toThrow('name is required')
+  })
+
+  it('rejects a malformed date', () => {
+    expect(() =>
+      parseMealPlanInput({ name: 'X', dateStart: '5.1.2026', dateEnd: '2026-01-07', peopleCount: 3 }),
+    ).toThrow('invalid dateStart')
+  })
+
+  it('rejects an inverted range', () => {
+    expect(() =>
+      parseMealPlanInput({ name: 'X', dateStart: '2026-01-07', dateEnd: '2026-01-05', peopleCount: 3 }),
+    ).toThrow('dateEnd must not be before dateStart')
+  })
+
+  it('rejects a range longer than the max', () => {
+    expect(() =>
+      parseMealPlanInput({ name: 'X', dateStart: '2026-01-01', dateEnd: '2026-06-01', peopleCount: 3 }),
+    ).toThrow(/date range must not exceed/)
+  })
+
+  it('rejects a non-positive peopleCount', () => {
+    expect(() =>
+      parseMealPlanInput({ name: 'X', dateStart: '2026-01-05', dateEnd: '2026-01-07', peopleCount: 0 }),
+    ).toThrow('invalid peopleCount')
+  })
+})
+
+describe('parseMealPlanSlotInput', () => {
+  it('parses assigning a recipe', () => {
+    expect(parseMealPlanSlotInput({ date: '2026-01-05', mealType: 'lunch', recipeId: 3, isSkip: false })).toEqual({
+      date: '2026-01-05',
+      mealType: 'lunch',
+      recipeId: 3,
+      isSkip: false,
+    })
+  })
+
+  it('parses marking skip', () => {
+    expect(parseMealPlanSlotInput({ date: '2026-01-05', mealType: 'lunch', recipeId: null, isSkip: true })).toEqual({
+      date: '2026-01-05',
+      mealType: 'lunch',
+      recipeId: null,
+      isSkip: true,
+    })
+  })
+
+  it('parses clearing a slot', () => {
+    expect(parseMealPlanSlotInput({ date: '2026-01-05', mealType: 'lunch', recipeId: null, isSkip: false })).toEqual({
+      date: '2026-01-05',
+      mealType: 'lunch',
+      recipeId: null,
+      isSkip: false,
+    })
+  })
+
+  it('rejects an invalid mealType', () => {
+    expect(() =>
+      parseMealPlanSlotInput({ date: '2026-01-05', mealType: 'brunch', recipeId: null, isSkip: false }),
+    ).toThrow('invalid mealType')
+  })
+
+  it('rejects a recipeId that is skip and assigned at once', () => {
+    expect(() =>
+      parseMealPlanSlotInput({ date: '2026-01-05', mealType: 'lunch', recipeId: 3, isSkip: true }),
+    ).toThrow('a skipped slot cannot also have a recipe')
+  })
+
+  it('rejects a non-boolean isSkip', () => {
+    expect(() =>
+      parseMealPlanSlotInput({ date: '2026-01-05', mealType: 'lunch', recipeId: null, isSkip: 'yes' }),
+    ).toThrow('isSkip must be a boolean')
+  })
+})
+
+describe('parseMealPlanTrayInput', () => {
+  it('parses a valid recipeId', () => {
+    expect(parseMealPlanTrayInput({ recipeId: 5 })).toEqual({ recipeId: 5 })
+  })
+
+  it('rejects a missing recipeId', () => {
+    expect(() => parseMealPlanTrayInput({})).toThrow('invalid recipeId')
+  })
+
+  it('rejects a non-positive recipeId', () => {
+    expect(() => parseMealPlanTrayInput({ recipeId: 0 })).toThrow('invalid recipeId')
   })
 })

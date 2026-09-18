@@ -1,6 +1,11 @@
+import { MEAL_PLAN_MAX_DAYS, mealPlanDateRange } from '#shared/utils/meal-plan'
+import { MEAL_TYPES } from '#shared/types/meal-plan'
+import type { MealPlanInput, MealPlanSlotInput, MealType } from '#shared/types/meal-plan'
 import { CATEGORIES, DIFFICULTIES } from '#shared/types/recipe'
 import type { Category, Difficulty, RecipeInput } from '#shared/types/recipe'
 import type { ShoppingListInput } from '#shared/types/shopping-list'
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 export function parseRecipeInput(body: unknown): RecipeInput {
   const b = body as Record<string, unknown>
@@ -90,4 +95,71 @@ export function parseShoppingListItemPatch(body: unknown): { key: string; checke
   }
 
   return { key: b.key, checked: b.checked }
+}
+
+// POST /api/meal-plans and PUT /api/meal-plans/:id — name, an inclusive
+// date range, and how many people a filled slot feeds. Range length is
+// capped (see MEAL_PLAN_MAX_DAYS) so a typo'd year doesn't try to generate
+// thousands of slot rows in syncMealPlanSlots.
+export function parseMealPlanInput(body: unknown): MealPlanInput {
+  const b = body as Record<string, unknown>
+
+  if (typeof b?.name !== 'string' || !b.name.trim()) {
+    throw createError({ statusCode: 400, statusMessage: 'name is required' })
+  }
+  if (typeof b.dateStart !== 'string' || !DATE_RE.test(b.dateStart)) {
+    throw createError({ statusCode: 400, statusMessage: 'invalid dateStart' })
+  }
+  if (typeof b.dateEnd !== 'string' || !DATE_RE.test(b.dateEnd)) {
+    throw createError({ statusCode: 400, statusMessage: 'invalid dateEnd' })
+  }
+  const dates = mealPlanDateRange(b.dateStart, b.dateEnd)
+  if (!dates.length) {
+    throw createError({ statusCode: 400, statusMessage: 'dateEnd must not be before dateStart' })
+  }
+  if (dates.length > MEAL_PLAN_MAX_DAYS) {
+    throw createError({ statusCode: 400, statusMessage: `date range must not exceed ${MEAL_PLAN_MAX_DAYS} days` })
+  }
+  const peopleCount = Number(b.peopleCount)
+  if (!Number.isInteger(peopleCount) || peopleCount < 1) {
+    throw createError({ statusCode: 400, statusMessage: 'invalid peopleCount' })
+  }
+
+  return { name: b.name.trim(), dateStart: b.dateStart, dateEnd: b.dateEnd, peopleCount }
+}
+
+// PUT /api/meal-plans/:id/slots — sets one slot's recipe/skip state. The
+// route checks the date falls within the plan's own range; this only
+// validates shape.
+export function parseMealPlanSlotInput(body: unknown): MealPlanSlotInput {
+  const b = body as Record<string, unknown>
+
+  if (typeof b?.date !== 'string' || !DATE_RE.test(b.date)) {
+    throw createError({ statusCode: 400, statusMessage: 'invalid date' })
+  }
+  if (typeof b.mealType !== 'string' || !MEAL_TYPES.includes(b.mealType as MealType)) {
+    throw createError({ statusCode: 400, statusMessage: 'invalid mealType' })
+  }
+  if (b.recipeId !== null && !(Number.isInteger(b.recipeId) && (b.recipeId as number) > 0)) {
+    throw createError({ statusCode: 400, statusMessage: 'invalid recipeId' })
+  }
+  if (typeof b.isSkip !== 'boolean') {
+    throw createError({ statusCode: 400, statusMessage: 'isSkip must be a boolean' })
+  }
+  if (b.isSkip && b.recipeId !== null) {
+    throw createError({ statusCode: 400, statusMessage: 'a skipped slot cannot also have a recipe' })
+  }
+
+  return { date: b.date, mealType: b.mealType as MealType, recipeId: b.recipeId as number | null, isSkip: b.isSkip }
+}
+
+// POST /api/meal-plans/:id/tray — add a recipe to the plan's tray.
+export function parseMealPlanTrayInput(body: unknown): { recipeId: number } {
+  const b = body as Record<string, unknown>
+
+  if (!(Number.isInteger(b?.recipeId) && (b.recipeId as number) > 0)) {
+    throw createError({ statusCode: 400, statusMessage: 'invalid recipeId' })
+  }
+
+  return { recipeId: b.recipeId as number }
 }
