@@ -3,9 +3,9 @@
 // one shopping list. The raw string stays the only thing ever stored or
 // edited (see app/components/RecipeForm.vue) — this parses it on demand,
 // purely in memory, each time a shopping list is built. Nothing here is
-// persisted, matching the app's existing shopping-mode philosophy that
-// shopping-related state is derived and disposable (see the non-persisted
-// checked-ingredient Set in app/components/RecipeCard.vue).
+// persisted — shopping-related state is derived and disposable throughout
+// the app (see the non-persisted cart selection in app/pages/index.vue and
+// the checked-item Set in app/pages/shopping-list.vue).
 //
 // Grouping is intentionally conservative: only an exact match on the
 // normalized ingredient name (after the amount+unit prefix is stripped)

@@ -24,27 +24,16 @@ const VIEW_MODES: { mode: ViewMode; glyph: string; label: string }[] = [
   { mode: 'list', glyph: '☰', label: 'Zobrazit seznam' },
   { mode: 'gallery', glyph: '▦', label: 'Zobrazit galerii' },
 ]
-// Picking several recipes to combine into one shopping list (see
-// app/pages/shopping-list.vue). Only meaningful in the gallery/list views —
-// the cards/carousel view already has its own unrelated single-recipe
-// shopping mode (see CardStack.vue) — so switching to "cards" drops it.
-const selectMode = ref(false)
-const { items: selected, toggle: onRecipeTileClick, clear: clearSelected } = useToggleSet<number>()
-
-watch(viewMode, (mode) => {
-  if (mode === 'cards') {
-    selectMode.value = false
-    clearSelected()
-  }
-})
-
-function toggleSelectMode() {
-  selectMode.value = !selectMode.value
-  if (!selectMode.value) clearSelected()
-}
+// Picking recipes to combine into one shopping list (see
+// app/pages/shopping-list.vue and useCart.ts). The same app-wide cart is
+// shared by every view mode: a tap on the always-visible checkbox in
+// gallery/list, or the 🛒 "add to cart" action on the centered card in the
+// carousel (see CardStack.vue) — so switching views, or tabs, keeps
+// whatever's already picked.
+const { ids: cartIds, has: inCart, toggle: toggleCart } = useCart()
 
 function goToShoppingList() {
-  navigateTo(`/shopping-list?ids=${[...selected.value].join(',')}`)
+  navigateTo(`/shopping-list?ids=${cartIds.value.join(',')}`)
 }
 
 const categoryMenuOpen = ref(false)
@@ -388,17 +377,6 @@ async function copyImportPrompt(lang: PromptLang) {
           </button>
         </div>
         <button
-          v-if="viewMode !== 'cards'"
-          type="button"
-          class="view-toggle"
-          :class="{ active: selectMode }"
-          aria-label="Vybrat recepty pro nákupní seznam"
-          :aria-pressed="selectMode"
-          @click="toggleSelectMode"
-        >
-          🛒
-        </button>
-        <button
           type="button"
           class="view-toggle"
           aria-label="Nahrát recept z JSON"
@@ -425,7 +403,7 @@ async function copyImportPrompt(lang: PromptLang) {
     <p v-else-if="!pending && !sorted.length" class="empty">Žádné recepty neodpovídají hledání ani filtru.</p>
 
     <div v-else-if="viewMode === 'cards'" class="carousel-wrap">
-      <CardStack :recipes="sorted" />
+      <CardStack :recipes="sorted" :selected-ids="cartIds" @toggle-select="toggleCart" />
     </div>
 
     <div v-else-if="viewMode === 'gallery'" class="gallery">
@@ -434,7 +412,7 @@ async function copyImportPrompt(lang: PromptLang) {
         :key="recipe.id"
         :to="`/recipes/${recipe.id}`"
         class="tile"
-        :class="{ 'no-photo': !recipe.photoFile, selected: selectMode && selected.has(recipe.id) }"
+        :class="{ 'no-photo': !recipe.photoFile, selected: inCart(recipe.id) }"
         :style="{ '--edge': `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
       >
         <!-- A plain NuxtLink keeps its default hover/visibility route
@@ -448,11 +426,10 @@ async function copyImportPrompt(lang: PromptLang) {
         navigated. stopPropagation is kept anyway so vue-router's own click
         handler doesn't do pointless work once defaultPrevented is set. -->
         <div
-          v-if="selectMode"
           class="select-overlay"
-          @click.stop.prevent="onRecipeTileClick(recipe.id)"
+          @click.stop.prevent="toggleCart(recipe.id)"
         >
-          <span class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
+          <span class="select-check" :class="{ checked: inCart(recipe.id) }" aria-hidden="true" />
         </div>
         <img v-if="recipe.photoFile" :src="recipePhotoUrl(recipe, 'thumb')!" alt="" class="tile-photo" loading="lazy">
         <span class="tile-cap">
@@ -473,21 +450,20 @@ async function copyImportPrompt(lang: PromptLang) {
       </NuxtLink>
     </div>
 
-    <div v-else class="list" :class="{ 'select-mode': selectMode }">
+    <div v-else class="list">
       <NuxtLink
         v-for="recipe in sorted"
         :key="recipe.id"
         :to="`/recipes/${recipe.id}`"
         class="row"
-        :class="{ selected: selectMode && selected.has(recipe.id) }"
+        :class="{ selected: inCart(recipe.id) }"
         :style="{ borderLeftColor: `var(--${recipe.cookTimeDifficulty.toLowerCase()})` }"
       >
         <div
-          v-if="selectMode"
           class="select-overlay"
-          @click.stop.prevent="onRecipeTileClick(recipe.id)"
+          @click.stop.prevent="toggleCart(recipe.id)"
         >
-          <span class="select-check" :class="{ checked: selected.has(recipe.id) }" aria-hidden="true" />
+          <span class="select-check" :class="{ checked: inCart(recipe.id) }" aria-hidden="true" />
         </div>
         <div class="row-main">
           <div class="row-name">{{ recipe.name }}</div>
@@ -538,8 +514,8 @@ async function copyImportPrompt(lang: PromptLang) {
 
     <InfoToast v-if="promptToast" :message="promptToast" @dismiss="dismissPromptToast" />
 
-    <div v-if="selectMode && selected.size" class="selection-bar">
-      <span>{{ selected.size }} vybráno</span>
+    <div v-if="cartIds.length" class="selection-bar">
+      <span>{{ cartIds.length }} vybráno</span>
       <button type="button" class="selection-bar-btn" @click="goToShoppingList">
         🛒 Vytvořit nákupní seznam
       </button>
@@ -872,19 +848,18 @@ async function copyImportPrompt(lang: PromptLang) {
   outline-offset: -2px;
 }
 
-/* Select mode makes the checkbox an overlay (see .select-overlay) rather
-   than a real flex child, so the row text needs to make room for it by
-   hand. */
-.list.select-mode .row-main {
+/* The checkbox is an overlay (see .select-overlay) rather than a real flex
+   child, so the row text needs to make room for it by hand. */
+.list .row-main {
   margin-left: 30px;
 }
 
 /* Covers the whole tile/row so any click on it toggles selection —
    stopPropagation (not preventDefault) is what keeps the NuxtLink under it
-   from navigating; see onRecipeTileClick's usage in the template. Kept as
-   its own element instead of a handler on the NuxtLink itself so the link
-   stays a plain, non-`custom` NuxtLink and keeps Nuxt's automatic
-   hover/visibility route prefetching outside select mode. */
+   from navigating; see toggleCart's usage in the template. Kept as its
+   own element instead of a handler on the NuxtLink itself so the link stays
+   a plain, non-`custom` NuxtLink and keeps Nuxt's automatic
+   hover/visibility route prefetching. */
 .select-overlay {
   position: absolute;
   inset: 0;

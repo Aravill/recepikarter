@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { CATEGORY_LABELS, DIFFICULTY_LABELS, difficultyColor } from '#shared/types/recipe'
 import type { Recipe, RecipeInput } from '#shared/types/recipe'
+import { recipePhotoUrl } from '#shared/utils/recipe-photo'
 
 const props = withDefaults(
   defineProps<{
     recipe: Recipe | RecipeInput
     side?: 'front' | 'back'
-    // Shopping mode: the front's ingredient bullets become checkboxes so
-    // the card can be ticked off in a shop. Purely visual state — see
-    // `checked` below.
-    shopping?: boolean
+    // Whether this recipe is in the shopping cart (see useCart.ts) —
+    // purely a visual ring around the card, independent of `side`.
+    selected?: boolean
+    // Persistently dismissed the photo overlay below (see CardStack's
+    // flipCenter) — distinct from the hover-only fade, which is plain CSS.
+    photoHidden?: boolean
   }>(),
-  { side: 'front', shopping: false },
+  { side: 'front', selected: false, photoHidden: false },
 )
 
 const stripe = computed(() => difficultyColor(props.recipe.cookTimeDifficulty))
@@ -21,23 +24,22 @@ const tags = computed(() => props.recipe.tags.filter((t) => t.trim()))
 // Only a saved Recipe carries an author (server-stamped on create) — a
 // RecipeInput being edited/previewed doesn't have one yet.
 const author = computed(() => ('author' in props.recipe ? props.recipe.author : ''))
-
-// Which ingredients (by index into `ingredients`) are ticked off. Deliberately
-// not persisted anywhere: a shopping list is done once the trip is, so
-// leaving shopping mode simply forgets it.
-const { items: checked, toggle: toggleChecked, clear: clearChecked } = useToggleSet<number>()
-
-watch(
-  () => props.shopping,
-  (shopping) => {
-    if (!shopping) clearChecked()
-  },
-)
+// Same story as `author` — only a saved Recipe (with an id and a photoFile)
+// can have an uploaded photo; a RecipeInput being edited/previewed can't.
+const photoUrl = computed(() => ('photoFile' in props.recipe ? recipePhotoUrl(props.recipe, 'thumb') : null))
 </script>
 
 <template>
-  <div class="card-preview" :style="{ '--stripe': stripe }">
+  <div class="card-preview" :class="{ selected }" :style="{ '--stripe': stripe }">
     <div class="mini-stripe" />
+
+    <div v-if="side === 'front' && photoUrl" class="photo-overlay" :class="{ hidden: photoHidden }">
+      <img :src="photoUrl" alt="" class="photo-overlay-img">
+      <div class="photo-overlay-cap">
+        <span class="photo-overlay-eyebrow">{{ CATEGORY_LABELS[recipe.category].toLocaleUpperCase('cs') }}</span>
+        <span class="photo-overlay-name">{{ recipe.name }}</span>
+      </div>
+    </div>
 
     <div v-if="side === 'front'" class="mini-body">
       <div>
@@ -62,14 +64,8 @@ watch(
 
       <div v-if="ingredients.length" class="mini-ingredients">
         <p class="mini-section">SUROVINY</p>
-        <ul class="mini-list" :class="{ shopping }">
-          <li v-for="(ingredient, i) in ingredients" :key="i" :class="{ checked: checked.has(i) }">
-            <label v-if="shopping" class="mini-check">
-              <input type="checkbox" :checked="checked.has(i)" @change="toggleChecked(i)">
-              <span>{{ ingredient }}</span>
-            </label>
-            <template v-else>{{ ingredient }}</template>
-          </li>
+        <ul class="mini-list">
+          <li v-for="(ingredient, i) in ingredients" :key="i">{{ ingredient }}</li>
         </ul>
       </div>
 
@@ -98,6 +94,7 @@ watch(
 <style scoped>
 .card-preview {
   --stripe: var(--medium);
+  position: relative;
   width: 240px;
   height: 502px;
   background: var(--surface);
@@ -106,6 +103,81 @@ watch(
   box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
+}
+
+/* The photo stands in for the front face while it's up — covering
+   everything below the difficulty stripe, which stays visible as the one
+   constant signal across both states (see docs/design-system.md). Mouse:
+   hovering peeks the ingredients underneath, pure CSS, no JS state
+   involved. Touch has no hover, so CardStack's tap handling toggles
+   `photoHidden` instead — the first tap does what hover does here, a
+   second tap then flips the card. */
+.photo-overlay {
+  position: absolute;
+  inset: 16px 0 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* Same tone as the card underneath — swapping recipes (e.g. mid-swipe in
+     CardStack) gives the new <img> a moment to decode even from cache, and
+     without an opaque backdrop here that gap let the ingredient list
+     underneath flash through before the photo painted. */
+  background: var(--surface);
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+
+.photo-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card-preview:hover .photo-overlay {
+    opacity: 0;
+  }
+}
+
+.photo-overlay-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-overlay-cap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 40px 16px 16px;
+  background: linear-gradient(to top, rgba(28, 22, 18, 0.85), rgba(28, 22, 18, 0));
+}
+
+.photo-overlay-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(253, 249, 242, 0.8);
+}
+
+.photo-overlay-name {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.15;
+  color: #fdf9f2;
+}
+
+/* Same ring language as a selected gallery tile/list row (see
+   app/pages/index.vue) — sits outside the card's own drop shadow instead of
+   clipping into the printed-card face. */
+.card-preview.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .mini-stripe {
@@ -215,65 +287,6 @@ watch(
   border-radius: 50%;
   border: 1px solid var(--stripe);
   flex: none;
-}
-
-/* Shopping mode: the bullet gives way to a real checkbox and each row
-   grows into a comfortable thumb target — this is the one view of the card
-   that's meant to be poked at repeatedly on a phone in a shop aisle. */
-.mini-list.shopping {
-  gap: 2px;
-}
-
-.mini-list.shopping li::before {
-  content: none;
-}
-
-.mini-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  width: 100%;
-  padding: 4px 2px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.mini-check input {
-  appearance: none;
-  margin: 0;
-  flex: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  border: 1.5px solid var(--stripe);
-  background: var(--surface);
-  display: grid;
-  place-content: center;
-  cursor: pointer;
-}
-
-.mini-check input::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  transform: scale(0);
-  transition: transform 0.12s ease-in-out;
-  background: var(--stripe);
-  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-}
-
-.mini-check input:checked::before {
-  transform: scale(1);
-}
-
-.mini-check input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.mini-list li.checked .mini-check span {
-  color: var(--surface-ink-dim);
-  text-decoration: line-through;
 }
 
 .mini-steps {

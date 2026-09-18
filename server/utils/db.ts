@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import Database from 'better-sqlite3'
 import type { Recipe, RecipeInput } from '#shared/types/recipe'
+import type { ShoppingList, ShoppingListItem } from '#shared/types/shopping-list'
 import type { AppUser, UserStatus } from '#shared/types/user'
 import { normalizeRecipeName } from '#shared/utils/recipe-name'
 
@@ -211,6 +212,133 @@ export function setRecipePhoto(id: number, file: string | null): Recipe | undefi
   const result = db.prepare('UPDATE recipes SET photo_file = ? WHERE id = ?').run(file, id)
   if (result.changes === 0) return undefined
   return getRecipe(id)
+}
+
+// A brand-new table, unlike `recipes`/`users` above — every already-deployed
+// database is equally missing it, so CREATE TABLE IF NOT EXISTS alone
+// upgrades it in place on next start. The PRAGMA/ALTER TABLE dance in
+// CLAUDE.md's gotcha is only needed when a column is added to a table that
+// already existed before the column did.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shopping_lists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    owner_username TEXT NOT NULL,
+    items_json TEXT NOT NULL DEFAULT '[]',
+    shared INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`)
+
+interface ShoppingListRow {
+  id: number
+  name: string
+  owner_username: string
+  items_json: string
+  shared: number
+  created_at: string
+  updated_at: string
+}
+
+function rowToShoppingList(row: ShoppingListRow): ShoppingList {
+  return {
+    id: row.id,
+    name: row.name,
+    ownerUsername: row.owner_username,
+    items: JSON.parse(row.items_json),
+    shared: !!row.shared,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+// A user's own lists plus every shared list regardless of owner, most
+// recently active first — never someone else's private list. The
+// owner/shared split (and who may mutate what) is enforced by the API
+// routes under server/api/shopping-lists/, not here.
+export function listShoppingLists(username: string): ShoppingList[] {
+  const rows = db
+    .prepare('SELECT * FROM shopping_lists WHERE owner_username = ? OR shared = 1 ORDER BY updated_at DESC')
+    .all(username) as ShoppingListRow[]
+  return rows.map(rowToShoppingList)
+}
+
+export function getShoppingList(id: number): ShoppingList | undefined {
+  const row = db.prepare('SELECT * FROM shopping_lists WHERE id = ?').get(id) as ShoppingListRow | undefined
+  return row ? rowToShoppingList(row) : undefined
+}
+
+export function createShoppingList(name: string, ownerUsername: string, items: ShoppingListItem[]): ShoppingList {
+  const now = new Date().toISOString()
+  const stmt = db.prepare(`
+    INSERT INTO shopping_lists (name, owner_username, items_json, shared, created_at, updated_at)
+    VALUES (@name, @ownerUsername, @itemsJson, 0, @createdAt, @updatedAt)
+  `)
+  const result = stmt.run({
+    name,
+    ownerUsername,
+    itemsJson: JSON.stringify(items),
+    createdAt: now,
+    updatedAt: now,
+  })
+  return getShoppingList(Number(result.lastInsertRowid))!
+}
+
+// Rename and the shared toggle are the only owner-editable metadata — who's
+// allowed to call this is enforced by the PATCH route, not here (same split
+// as updateRecipe not checking author itself).
+export function updateShoppingListMeta(
+  id: number,
+  patch: { name?: string; shared?: boolean },
+): ShoppingList | undefined {
+  const existing = getShoppingList(id)
+  if (!existing) return undefined
+  const now = new Date().toISOString()
+  db.prepare('UPDATE shopping_lists SET name = ?, shared = ?, updated_at = ? WHERE id = ?').run(
+    patch.name ?? existing.name,
+    (patch.shared ?? existing.shared) ? 1 : 0,
+    now,
+    id,
+  )
+  return getShoppingList(id)
+}
+
+export function deleteShoppingList(id: number): boolean {
+  const result = db.prepare('DELETE FROM shopping_lists WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
+// Unticks every item — the persisted equivalent of the ephemeral "clear
+// checkboxes" every other shopping-related view in this app had until now
+// (see useToggleSet.ts).
+export function resetShoppingListItems(id: number): ShoppingList | undefined {
+  const existing = getShoppingList(id)
+  if (!existing) return undefined
+  const now = new Date().toISOString()
+  const items = existing.items.map((item) => ({ ...item, checked: false }))
+  db.prepare('UPDATE shopping_lists SET items_json = ?, updated_at = ? WHERE id = ?').run(
+    JSON.stringify(items),
+    now,
+    id,
+  )
+  return getShoppingList(id)
+}
+
+// A small targeted update keyed by item `key`, not a full-list overwrite —
+// two people ticking different items on a shared list around the same time
+// shouldn't stomp each other.
+export function setShoppingListItemChecked(id: number, key: string, checked: boolean): ShoppingList | undefined {
+  const existing = getShoppingList(id)
+  if (!existing) return undefined
+  const now = new Date().toISOString()
+  const items = existing.items.map((item) => (item.key === key ? { ...item, checked } : item))
+  db.prepare('UPDATE shopping_lists SET items_json = ?, updated_at = ? WHERE id = ?').run(
+    JSON.stringify(items),
+    now,
+    id,
+  )
+  return getShoppingList(id)
 }
 
 interface UserRow {

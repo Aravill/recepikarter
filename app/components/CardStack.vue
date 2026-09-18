@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Recipe } from '#shared/types/recipe'
 
-const props = defineProps<{ recipes: Recipe[] }>()
+const props = defineProps<{ recipes: Recipe[]; selectedIds: number[] }>()
+const emit = defineEmits<{ toggleSelect: [id: number] }>()
 
 const { markExported } = useRecipes()
 
@@ -26,12 +27,17 @@ const NEIGHBOR_OPACITY = 0.6
 const index = ref(0)
 const side = ref<'front' | 'back'>('front')
 const actionsShown = ref(false)
+const downloadMenuOpen = ref(false)
 const exporting = ref(false)
-// Shopping mode: the center card's ingredients become a tick-off list and
-// the stack freezes around it — no swipe, flip, long press, keyboard nav or
-// actions until the user leaves the mode via the button under the card.
-// The ticks themselves live in RecipeCard and are forgotten on exit.
-const shopping = ref(false)
+// Whether the centered card's photo overlay has been dismissed by a tap
+// (see flipCenter and RecipeCard's own hover-only fade). Reset whenever the
+// centered card changes, so swiping brings the next card's photo back.
+const photoHidden = ref(false)
+// Hover-capable pointers get the photo-fade for free via CSS (see
+// RecipeCard) — a tap there should flip straight away instead of also
+// consuming a tap to dismiss the photo, since there's nothing left for it
+// to dismiss.
+const canHover = ref(false)
 // The track's current translateX, in px. Tracks the live drag 1:1 while
 // dragging; animated (via CSS transition) to a target slot offset or back
 // to 0 otherwise.
@@ -75,6 +81,7 @@ function readSlotPx() {
 onMounted(() => {
   readSlotPx()
   window.addEventListener('resize', readSlotPx)
+  canHover.value = window.matchMedia('(hover: hover) and (pointer: fine)').matches
 })
 
 onUnmounted(() => {
@@ -104,15 +111,21 @@ watch(
     index.value = 0
     side.value = 'front'
     actionsShown.value = false
-    // The list under the stack changed (filter/search) — the card being
-    // shopped for may not even be in it anymore.
-    shopping.value = false
+    photoHidden.value = false
   },
 )
 
 watch(index, () => {
   side.value = 'front'
   actionsShown.value = false
+  photoHidden.value = false
+})
+
+// The download dropdown lives inside the actions panel, so it has no reason
+// to stay open once the panel itself is hidden (a tap elsewhere, a slide, a
+// card/recipe change).
+watch(actionsShown, (shown) => {
+  if (!shown) downloadMenuOpen.value = false
 })
 
 function setFlipCardRef(el: unknown) {
@@ -120,6 +133,7 @@ function setFlipCardRef(el: unknown) {
 }
 
 async function onExportPng() {
+  downloadMenuOpen.value = false
   const frontEl = flipCardRef.value?.frontEl
   const backEl = flipCardRef.value?.backEl
   const recipe = current.value
@@ -137,23 +151,12 @@ async function onExportPng() {
 }
 
 function onExportJson() {
+  downloadMenuOpen.value = false
   if (current.value) exportRecipeJson(current.value)
 }
 
 function onEdit() {
   if (current.value) navigateTo(`/recipes/${current.value.id}`)
-}
-
-function enterShopping() {
-  if (!current.value) return
-  actionsShown.value = false
-  // Ingredients are on the front.
-  side.value = 'front'
-  shopping.value = true
-}
-
-function exitShopping() {
-  shopping.value = false
 }
 
 function clearLongPressTimer() {
@@ -180,7 +183,7 @@ function animateTrackTo(target: number, onSettled: () => void) {
 }
 
 function slideTo(direction: 1 | -1) {
-  if (sliding.value || shopping.value || n.value === 0) return
+  if (sliding.value || n.value === 0) return
   animateTrackTo(direction === 1 ? -slotPx : slotPx, () => {
     index.value = wrapIndex(index.value + direction, n.value)
     // The window re-renders around the new index, so the after-state is
@@ -211,11 +214,10 @@ function getSlotOffset(target: HTMLElement): number | null {
 }
 
 function onPointerDown(e: PointerEvent) {
-  if ((e.target as HTMLElement).closest('.card-action-btn')) return
-  // In shopping mode the only interaction on the track is ticking the
-  // checkboxes, which are plain native inputs — leaving the pointer alone
-  // here is what lets their clicks through untouched.
-  if (sliding.value || shopping.value) return
+  // Covers the download dropdown's options too, not just the action buttons
+  // themselves — anything in here is its own tap target, never a drag start.
+  if ((e.target as HTMLElement).closest('.card-actions')) return
+  if (sliding.value) return
   dragging.value = true
   movedPastTapThreshold = false
   longPressFired = false
@@ -290,12 +292,23 @@ function onPointerUp(e: PointerEvent) {
 function flipCenter() {
   // Same rule as a tap on the center card: while the actions are showing,
   // the gesture dismisses them instead of flipping.
-  if (actionsShown.value) actionsShown.value = false
-  else side.value = side.value === 'front' ? 'back' : 'front'
+  if (actionsShown.value) {
+    actionsShown.value = false
+    return
+  }
+  // No hover on this pointer, front's showing its photo, and that photo
+  // hasn't already been dismissed: the first tap plays the role a mouse
+  // hover plays for free — reveal the ingredients — and a second tap is
+  // needed to actually flip. A hover-capable pointer skips straight to the
+  // flip, since hovering already reveals the front before the tap lands.
+  if (!canHover.value && side.value === 'front' && current.value?.photoFile && !photoHidden.value) {
+    photoHidden.value = true
+    return
+  }
+  side.value = side.value === 'front' ? 'back' : 'front'
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (shopping.value) return
   if (e.key === 'ArrowLeft') goPrev()
   else if (e.key === 'ArrowRight') goNext()
   else if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
@@ -312,7 +325,6 @@ function onKeydown(e: KeyboardEvent) {
     <div
       ref="stageRef"
       class="stage"
-      :class="{ shopping }"
       tabindex="0"
       :style="{
         '--card-width': `${CARD_WIDTH}px`,
@@ -344,33 +356,57 @@ function onKeydown(e: KeyboardEvent) {
             zIndex: 10 - Math.abs(slot.offset),
           }"
         >
-          <FlipCard v-if="slot.offset === 0" :ref="setFlipCardRef" :recipe="slot.recipe" :side="side" :shopping="shopping" />
-          <RecipeCard v-else :recipe="slot.recipe" side="front" />
+          <FlipCard
+            v-if="slot.offset === 0"
+            :ref="setFlipCardRef"
+            :recipe="slot.recipe"
+            :side="side"
+            :selected="selectedIds.includes(slot.recipe.id)"
+            :photo-hidden="photoHidden"
+          />
+          <RecipeCard v-else :recipe="slot.recipe" side="front" :selected="selectedIds.includes(slot.recipe.id)" />
 
-          <div v-if="slot.offset === 0 && !shopping" class="card-actions" :class="{ shown: actionsShown }">
+          <div v-if="slot.offset === 0" class="card-actions" :class="{ shown: actionsShown }">
             <button class="card-action-btn" aria-label="Upravit recept" @click.stop="onEdit">✎</button>
-            <button class="card-action-btn" aria-label="Nákupní režim" @click.stop="enterShopping">🛒</button>
             <button
               class="card-action-btn"
-              aria-label="Stáhnout PNG"
-              :disabled="exporting"
-              @click.stop="onExportPng"
+              :class="{ active: selectedIds.includes(slot.recipe.id) }"
+              :aria-label="selectedIds.includes(slot.recipe.id) ? 'Odebrat z nákupního seznamu' : 'Přidat do nákupního seznamu'"
+              :aria-pressed="selectedIds.includes(slot.recipe.id)"
+              @click.stop="emit('toggleSelect', slot.recipe.id)"
             >
-              ⬇
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6h16l-1.5 10h-13z" />
+                <path d="M8 10v4M12 10v4M16 10v4" />
+              </svg>
             </button>
-            <button class="card-action-btn" aria-label="Stáhnout JSON" @click.stop="onExportJson">{}</button>
+            <div class="card-action-menu">
+              <button
+                class="card-action-btn"
+                aria-label="Stáhnout recept"
+                aria-haspopup="menu"
+                :aria-expanded="downloadMenuOpen"
+                :disabled="exporting"
+                @click.stop="downloadMenuOpen = !downloadMenuOpen"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 4v10M8 10l4 4 4-4" />
+                  <path d="M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" />
+                </svg>
+              </button>
+              <div v-if="downloadMenuOpen" class="download-dropdown" role="menu">
+                <button type="button" role="menuitem" class="download-option" :disabled="exporting" @click.stop="onExportPng">
+                  PNG
+                </button>
+                <button type="button" role="menuitem" class="download-option" @click.stop="onExportJson">JSON</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="recipes.length && shopping" class="stack-nav">
-      <button type="button" class="shopping-exit" @click="exitShopping">
-        <span aria-hidden="true">🛒</span>
-        Ukončit nákupní režim
-      </button>
-    </div>
-    <div v-else-if="recipes.length" class="stack-nav">
+    <div v-if="recipes.length" class="stack-nav">
       <button type="button" aria-label="Předchozí recept" @click="goPrev">‹</button>
       <span class="stack-count">{{ index + 1 }} / {{ recipes.length }}</span>
       <button type="button" aria-label="Další recept" @click="goNext">›</button>
@@ -481,26 +517,6 @@ function onKeydown(e: KeyboardEvent) {
     pointer-events: auto;
     transform: translate(0, 0) scale(1);
   }
-
-  /* Neighbors aren't click targets while shopping, so don't advertise it. */
-  .stage.shopping .card-slot:not(.center) {
-    cursor: default;
-  }
-
-  .stage.shopping .card-slot:not(.center):hover {
-    opacity: var(--neighbor-opacity);
-  }
-}
-
-/* Shopping mode: the track stays put and the neighbors recede so the
-   center card reads as the single thing on screen. */
-.stage.shopping .track {
-  cursor: default;
-}
-
-.stage.shopping .card-slot:not(.center) {
-  opacity: calc(var(--neighbor-opacity) * 0.5);
-  transition: opacity 0.18s ease;
 }
 
 /* ±2 slots exist purely so a card is already in place when the track
@@ -548,7 +564,60 @@ function onKeydown(e: KeyboardEvent) {
   cursor: pointer;
 }
 
+.card-action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .card-action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.card-action-btn.active {
+  background: var(--accent);
+}
+
+.card-action-menu {
+  position: relative;
+}
+
+.download-dropdown {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+
+.download-option {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--surface-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.download-option:hover {
+  background: rgba(184, 80, 42, 0.14);
+  color: var(--accent);
+}
+
+.download-option:disabled {
   opacity: 0.6;
   cursor: default;
 }
@@ -571,18 +640,6 @@ function onKeydown(e: KeyboardEvent) {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-/* Same specificity as the `.stack-nav button` rule above, or its fixed
-   36px width would win and squash the label. */
-.stack-nav .shopping-exit {
-  width: auto;
-  padding: 0 16px;
-  border-color: var(--accent);
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 12px;
-  white-space: nowrap;
-  gap: 8px;
 }
 
 .stack-count {
