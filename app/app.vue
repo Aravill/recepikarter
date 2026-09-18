@@ -10,6 +10,11 @@ const showHeader = computed(
     !route.path.startsWith('/recipes'),
 )
 
+// The tab bar only makes sense on the tabbed sections themselves — not on
+// the admin/users detour, which stays reachable via the header's
+// "Uživatelé" link and has no tab of its own.
+const showTabs = computed(() => showHeader.value && (route.path === '/' || route.path === '/shopping-list'))
+
 async function onLogout() {
   await clear()
   await navigateTo('/login')
@@ -38,19 +43,22 @@ function dismissDarkModeToast() {
 <template>
   <div class="app-shell">
     <NuxtRouteAnnouncer />
-    <header v-if="showHeader" class="app-header">
-      <NuxtLink to="/" class="brand">
-        <img src="/icon.svg" alt="" class="brand-icon" width="22" height="22" />
-        Recepikarter
-      </NuxtLink>
-      <div class="header-actions">
-        <NuxtLink v-if="user?.role === 'admin'" to="/admin/users" class="admin-link" title="Správa uživatelů">
-          Uživatelé
+    <div v-if="showHeader" class="app-top">
+      <header class="app-header">
+        <NuxtLink to="/" class="brand">
+          <img src="/icon.svg" alt="" class="brand-icon" width="22" height="22" />
+          Recepikarter
         </NuxtLink>
-        <ThemeToggle @activated-dark="onActivatedDark" />
-        <button class="logout-btn" @click="onLogout">Odhlásit</button>
-      </div>
-    </header>
+        <div class="header-actions">
+          <NuxtLink v-if="user?.role === 'admin'" to="/admin/users" class="admin-link" title="Správa uživatelů">
+            Uživatelé
+          </NuxtLink>
+          <ThemeToggle @activated-dark="onActivatedDark" />
+          <button class="logout-btn" @click="onLogout">Odhlásit</button>
+        </div>
+      </header>
+      <TabBar v-if="showTabs" />
+    </div>
     <main class="app-main">
       <NuxtPage />
     </main>
@@ -123,10 +131,13 @@ a {
   flex-direction: column;
 }
 
-.app-header {
+.app-top {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
