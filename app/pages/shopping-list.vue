@@ -41,10 +41,7 @@ const { items: checked, toggle: toggleChecked } = useToggleSet<string>()
 
 <template>
   <div class="shopping-list-page">
-    <div class="header-row">
-      <h1>Nákupní seznam</h1>
-      <NuxtLink to="/" class="back-link">← Zpět</NuxtLink>
-    </div>
+    <h1>Nákupák</h1>
 
     <p v-if="pending" class="empty">Načítám…</p>
     <p v-else-if="!selectedRecipes.length" class="empty">Nebyly vybrány žádné recepty.</p>
@@ -73,28 +70,12 @@ const { items: checked, toggle: toggleChecked } = useToggleSet<string>()
   margin: 0 auto;
 }
 
-.header-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 14px;
-}
-
-.header-row h1 {
-  margin: 0;
+h1 {
+  margin: 0 0 14px;
   font-family: 'Fraunces', Georgia, serif;
   font-weight: 600;
   font-size: 24px;
   color: var(--text);
-}
-
-.back-link {
-  flex: none;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 12px;
-  color: var(--text-dim);
-  text-decoration: none;
 }
 
 .empty {
