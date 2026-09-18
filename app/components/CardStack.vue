@@ -27,6 +27,7 @@ const NEIGHBOR_OPACITY = 0.6
 const index = ref(0)
 const side = ref<'front' | 'back'>('front')
 const actionsShown = ref(false)
+const downloadMenuOpen = ref(false)
 const exporting = ref(false)
 // The track's current translateX, in px. Tracks the live drag 1:1 while
 // dragging; animated (via CSS transition) to a target slot offset or back
@@ -108,11 +109,19 @@ watch(index, () => {
   actionsShown.value = false
 })
 
+// The download dropdown lives inside the actions panel, so it has no reason
+// to stay open once the panel itself is hidden (a tap elsewhere, a slide, a
+// card/recipe change).
+watch(actionsShown, (shown) => {
+  if (!shown) downloadMenuOpen.value = false
+})
+
 function setFlipCardRef(el: unknown) {
   flipCardRef.value = el as { frontEl: HTMLElement | null; backEl: HTMLElement | null } | null
 }
 
 async function onExportPng() {
+  downloadMenuOpen.value = false
   const frontEl = flipCardRef.value?.frontEl
   const backEl = flipCardRef.value?.backEl
   const recipe = current.value
@@ -130,6 +139,7 @@ async function onExportPng() {
 }
 
 function onExportJson() {
+  downloadMenuOpen.value = false
   if (current.value) exportRecipeJson(current.value)
 }
 
@@ -192,7 +202,9 @@ function getSlotOffset(target: HTMLElement): number | null {
 }
 
 function onPointerDown(e: PointerEvent) {
-  if ((e.target as HTMLElement).closest('.card-action-btn')) return
+  // Covers the download dropdown's options too, not just the action buttons
+  // themselves — anything in here is its own tap target, never a drag start.
+  if ((e.target as HTMLElement).closest('.card-actions')) return
   if (sliding.value) return
   dragging.value = true
   movedPastTapThreshold = false
@@ -332,17 +344,32 @@ function onKeydown(e: KeyboardEvent) {
               :aria-pressed="selectedIds.has(slot.recipe.id)"
               @click.stop="emit('toggleSelect', slot.recipe.id)"
             >
-              🛒
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6h16l-1.5 10h-13z" />
+                <path d="M8 10v4M12 10v4M16 10v4" />
+              </svg>
             </button>
-            <button
-              class="card-action-btn"
-              aria-label="Stáhnout PNG"
-              :disabled="exporting"
-              @click.stop="onExportPng"
-            >
-              ⬇
-            </button>
-            <button class="card-action-btn" aria-label="Stáhnout JSON" @click.stop="onExportJson">{}</button>
+            <div class="card-action-menu">
+              <button
+                class="card-action-btn"
+                aria-label="Stáhnout recept"
+                aria-haspopup="menu"
+                :aria-expanded="downloadMenuOpen"
+                :disabled="exporting"
+                @click.stop="downloadMenuOpen = !downloadMenuOpen"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 4v10M8 10l4 4 4-4" />
+                  <path d="M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" />
+                </svg>
+              </button>
+              <div v-if="downloadMenuOpen" class="download-dropdown" role="menu">
+                <button type="button" role="menuitem" class="download-option" :disabled="exporting" @click.stop="onExportPng">
+                  PNG
+                </button>
+                <button type="button" role="menuitem" class="download-option" @click.stop="onExportJson">JSON</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -506,6 +533,11 @@ function onKeydown(e: KeyboardEvent) {
   cursor: pointer;
 }
 
+.card-action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .card-action-btn:disabled {
   opacity: 0.6;
   cursor: default;
@@ -513,6 +545,50 @@ function onKeydown(e: KeyboardEvent) {
 
 .card-action-btn.active {
   background: var(--accent);
+}
+
+.card-action-menu {
+  position: relative;
+}
+
+.download-dropdown {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+
+.download-option {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--surface-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.download-option:hover {
+  background: rgba(184, 80, 42, 0.14);
+  color: var(--accent);
+}
+
+.download-option:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .stack-nav {
