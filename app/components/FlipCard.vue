@@ -7,8 +7,10 @@ const props = withDefaults(
     side: 'front' | 'back'
     // Passed through to both faces — see RecipeCard.
     selected?: boolean
+    // Only meaningful on the front face — see RecipeCard.
+    photoHidden?: boolean
   }>(),
-  { selected: false },
+  { selected: false, photoHidden: false },
 )
 
 // The flip is modeled as one phase instead of `flipped` + `flipping`
@@ -165,7 +167,7 @@ function onFlipInnerTransitionEnd(e: TransitionEvent) {
 <template>
   <div class="flip-card" :class="{ 'has-3d': has3d }">
     <div class="flip-inner" :class="{ rotated, 'has-3d': has3d, 'no-transition': noTransition }" @transitionend="onFlipInnerTransitionEnd">
-      <RecipeCard ref="frontFaceRef" class="face face-front" :class="{ 'force-hidden': atRestBack }" :recipe="recipe" side="front" :selected="selected" />
+      <RecipeCard ref="frontFaceRef" class="face face-front" :class="{ 'force-hidden': atRestBack }" :recipe="recipe" side="front" :selected="selected" :photo-hidden="photoHidden" />
       <RecipeCard ref="backFaceRef" class="face face-back" :class="{ 'force-flat': atRestBack }" :recipe="recipe" side="back" :selected="selected" />
     </div>
   </div>

@@ -29,6 +29,15 @@ const side = ref<'front' | 'back'>('front')
 const actionsShown = ref(false)
 const downloadMenuOpen = ref(false)
 const exporting = ref(false)
+// Whether the centered card's photo overlay has been dismissed by a tap
+// (see flipCenter and RecipeCard's own hover-only fade). Reset whenever the
+// centered card changes, so swiping brings the next card's photo back.
+const photoHidden = ref(false)
+// Hover-capable pointers get the photo-fade for free via CSS (see
+// RecipeCard) — a tap there should flip straight away instead of also
+// consuming a tap to dismiss the photo, since there's nothing left for it
+// to dismiss.
+const canHover = ref(false)
 // The track's current translateX, in px. Tracks the live drag 1:1 while
 // dragging; animated (via CSS transition) to a target slot offset or back
 // to 0 otherwise.
@@ -72,6 +81,7 @@ function readSlotPx() {
 onMounted(() => {
   readSlotPx()
   window.addEventListener('resize', readSlotPx)
+  canHover.value = window.matchMedia('(hover: hover) and (pointer: fine)').matches
 })
 
 onUnmounted(() => {
@@ -101,12 +111,14 @@ watch(
     index.value = 0
     side.value = 'front'
     actionsShown.value = false
+    photoHidden.value = false
   },
 )
 
 watch(index, () => {
   side.value = 'front'
   actionsShown.value = false
+  photoHidden.value = false
 })
 
 // The download dropdown lives inside the actions panel, so it has no reason
@@ -280,8 +292,20 @@ function onPointerUp(e: PointerEvent) {
 function flipCenter() {
   // Same rule as a tap on the center card: while the actions are showing,
   // the gesture dismisses them instead of flipping.
-  if (actionsShown.value) actionsShown.value = false
-  else side.value = side.value === 'front' ? 'back' : 'front'
+  if (actionsShown.value) {
+    actionsShown.value = false
+    return
+  }
+  // No hover on this pointer, front's showing its photo, and that photo
+  // hasn't already been dismissed: the first tap plays the role a mouse
+  // hover plays for free — reveal the ingredients — and a second tap is
+  // needed to actually flip. A hover-capable pointer skips straight to the
+  // flip, since hovering already reveals the front before the tap lands.
+  if (!canHover.value && side.value === 'front' && current.value?.photoFile && !photoHidden.value) {
+    photoHidden.value = true
+    return
+  }
+  side.value = side.value === 'front' ? 'back' : 'front'
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -332,7 +356,14 @@ function onKeydown(e: KeyboardEvent) {
             zIndex: 10 - Math.abs(slot.offset),
           }"
         >
-          <FlipCard v-if="slot.offset === 0" :ref="setFlipCardRef" :recipe="slot.recipe" :side="side" :selected="selectedIds.includes(slot.recipe.id)" />
+          <FlipCard
+            v-if="slot.offset === 0"
+            :ref="setFlipCardRef"
+            :recipe="slot.recipe"
+            :side="side"
+            :selected="selectedIds.includes(slot.recipe.id)"
+            :photo-hidden="photoHidden"
+          />
           <RecipeCard v-else :recipe="slot.recipe" side="front" :selected="selectedIds.includes(slot.recipe.id)" />
 
           <div v-if="slot.offset === 0" class="card-actions" :class="{ shown: actionsShown }">
