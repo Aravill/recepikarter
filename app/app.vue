@@ -88,7 +88,7 @@ function dismissDarkModeToast() {
   --medium: #c98a2e;
   --hard: #a1423a;
 
-  /* Jídelníček (meal plan) recipe colors — a fixed, rotating set so a
+  /* Jídelnář (meal plan) recipe colors — a fixed, rotating set so a
      recipe reads as the same color everywhere it appears on the calendar
      (its tray badge and every slot it fills) and different recipes are
      told apart at a glance. Deliberately distinct hues from

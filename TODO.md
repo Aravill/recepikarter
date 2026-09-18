@@ -1,6 +1,6 @@
 # TODO
 
-Known follow-ups from the meal plan (jídelníček) feature (PR #33), not
+Known follow-ups from the meal plan (jídelnář) feature (PR #33), not
 blocking but worth a decision:
 
 - **Drag-and-drop has no touch/mobile support.** It uses native HTML5 DnD

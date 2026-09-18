@@ -508,7 +508,7 @@ function formatDate(iso: string) {
     </template>
 
     <template v-else>
-      <h1>Jídelníček</h1>
+      <h1>Jídelnář</h1>
 
       <div class="save-row">
         <button v-if="!createFormOpen" type="button" class="btn-primary" @click="openCreateForm">

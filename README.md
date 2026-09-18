@@ -20,7 +20,7 @@ never a raw form pretending to be the product.
   external service, easy to back up, easy to inspect.
 - **Renders** every recipe as a two-sided printable card and lets you
   download it (or print it directly) for lamination.
-- **Plans meals** (jídelníček) for a date range: a calendar of
+- **Plans meals** (jídelnář) for a date range: a calendar of
   breakfast/lunch/dinner slots per day, filled by dragging recipe cards from
   a tray, with a running counter of unfilled slots and portions.
 - **Builds shopping lists** by combining ingredients from several recipes at
