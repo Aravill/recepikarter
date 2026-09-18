@@ -1,9 +1,12 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import Database from 'better-sqlite3'
+import { MEAL_TYPES } from '#shared/types/meal-plan'
+import type { MealPlan, MealPlanInput, MealPlanSlot, MealPlanSlotInput } from '#shared/types/meal-plan'
 import type { Recipe, RecipeInput } from '#shared/types/recipe'
 import type { ShoppingList, ShoppingListItem } from '#shared/types/shopping-list'
 import type { AppUser, UserStatus } from '#shared/types/user'
+import { mealPlanDateRange } from '#shared/utils/meal-plan'
 import { normalizeRecipeName } from '#shared/utils/recipe-name'
 
 const dbPath = process.env.RECIPE_DB_PATH || join(process.cwd(), 'data', 'recipes.sqlite')
@@ -405,4 +408,228 @@ export function setUserPassword(id: number, passwordHash: string, mustChangePass
     now,
     id,
   )
+}
+
+// Three brand-new tables, like shopping_lists above — every already-deployed
+// database is equally missing them, so CREATE TABLE IF NOT EXISTS alone
+// upgrades it in place. meal_plan_slots has one row per date+meal_type+plan
+// (see MealPlanSlot's doc comment in shared/types/meal-plan.ts) — the UNIQUE
+// index both enforces that and lets setMealPlanSlot below use SQLite's
+// upsert syntax. meal_plan_recipes is the tray: which recipes have been
+// manually added to a plan, independent of whether they're used in a slot.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS meal_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    date_start TEXT NOT NULL,
+    date_end TEXT NOT NULL,
+    people_count INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS meal_plan_slots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    meal_type TEXT NOT NULL,
+    recipe_id INTEGER,
+    is_skip INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(plan_id, date, meal_type)
+  )
+`)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS meal_plan_recipes (
+    plan_id INTEGER NOT NULL,
+    recipe_id INTEGER NOT NULL,
+    UNIQUE(plan_id, recipe_id)
+  )
+`)
+
+interface MealPlanRow {
+  id: number
+  name: string
+  date_start: string
+  date_end: string
+  people_count: number
+  created_at: string
+  updated_at: string
+}
+
+function rowToMealPlan(row: MealPlanRow): MealPlan {
+  return {
+    id: row.id,
+    name: row.name,
+    dateStart: row.date_start,
+    dateEnd: row.date_end,
+    peopleCount: row.people_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function listMealPlans(): MealPlan[] {
+  const rows = db.prepare('SELECT * FROM meal_plans ORDER BY date_start DESC').all() as MealPlanRow[]
+  return rows.map(rowToMealPlan)
+}
+
+export function getMealPlan(id: number): MealPlan | undefined {
+  const row = db.prepare('SELECT * FROM meal_plans WHERE id = ?').get(id) as MealPlanRow | undefined
+  return row ? rowToMealPlan(row) : undefined
+}
+
+// Makes meal_plan_slots match the plan's current date range: adds an empty
+// row (recipe_id null, is_skip false) for every date × meal_type newly in
+// range, and removes rows for dates that fell out of range — dropping
+// whatever recipe/skip they held. Called after every create/update of a
+// plan's dates; a no-op on a range that hasn't changed.
+function syncMealPlanSlots(planId: number, dateStart: string, dateEnd: string): void {
+  const dates = new Set(mealPlanDateRange(dateStart, dateEnd))
+  const existing = db
+    .prepare('SELECT date, meal_type FROM meal_plan_slots WHERE plan_id = ?')
+    .all(planId) as { date: string; meal_type: string }[]
+  const existingKeys = new Set(existing.map((e) => `${e.date}|${e.meal_type}`))
+
+  const toDelete = existing.filter((e) => !dates.has(e.date))
+  if (toDelete.length) {
+    const del = db.prepare('DELETE FROM meal_plan_slots WHERE plan_id = ? AND date = ? AND meal_type = ?')
+    for (const e of toDelete) del.run(planId, e.date, e.meal_type)
+  }
+
+  const insert = db.prepare(
+    'INSERT INTO meal_plan_slots (plan_id, date, meal_type, recipe_id, is_skip) VALUES (?, ?, ?, NULL, 0)',
+  )
+  for (const date of dates) {
+    for (const mealType of MEAL_TYPES) {
+      if (!existingKeys.has(`${date}|${mealType}`)) insert.run(planId, date, mealType)
+    }
+  }
+}
+
+export function createMealPlan(input: MealPlanInput): MealPlan {
+  const now = new Date().toISOString()
+  const stmt = db.prepare(`
+    INSERT INTO meal_plans (name, date_start, date_end, people_count, created_at, updated_at)
+    VALUES (@name, @dateStart, @dateEnd, @peopleCount, @createdAt, @updatedAt)
+  `)
+  const result = stmt.run({
+    name: input.name,
+    dateStart: input.dateStart,
+    dateEnd: input.dateEnd,
+    peopleCount: input.peopleCount,
+    createdAt: now,
+    updatedAt: now,
+  })
+  const id = Number(result.lastInsertRowid)
+  syncMealPlanSlots(id, input.dateStart, input.dateEnd)
+  return getMealPlan(id)!
+}
+
+// Renaming, resizing the date range, or changing people_count all go
+// through here (the "Uložit plán" button — see the planning page). A
+// changed date range re-syncs slot rows via syncMealPlanSlots, which can
+// drop assignments on dates that fall out of the new range.
+export function updateMealPlan(id: number, input: MealPlanInput): MealPlan | undefined {
+  if (!getMealPlan(id)) return undefined
+  const now = new Date().toISOString()
+  db.prepare('UPDATE meal_plans SET name = ?, date_start = ?, date_end = ?, people_count = ?, updated_at = ? WHERE id = ?').run(
+    input.name,
+    input.dateStart,
+    input.dateEnd,
+    input.peopleCount,
+    now,
+    id,
+  )
+  syncMealPlanSlots(id, input.dateStart, input.dateEnd)
+  return getMealPlan(id)
+}
+
+export function deleteMealPlan(id: number): boolean {
+  db.prepare('DELETE FROM meal_plan_slots WHERE plan_id = ?').run(id)
+  db.prepare('DELETE FROM meal_plan_recipes WHERE plan_id = ?').run(id)
+  const result = db.prepare('DELETE FROM meal_plans WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
+interface MealPlanSlotRow {
+  id: number
+  plan_id: number
+  date: string
+  meal_type: string
+  recipe_id: number | null
+  is_skip: number
+}
+
+function rowToMealPlanSlot(row: MealPlanSlotRow): MealPlanSlot {
+  return {
+    id: row.id,
+    planId: row.plan_id,
+    date: row.date,
+    mealType: row.meal_type as MealPlanSlot['mealType'],
+    recipeId: row.recipe_id,
+    isSkip: !!row.is_skip,
+  }
+}
+
+export function listMealPlanSlots(planId: number): MealPlanSlot[] {
+  const rows = db
+    .prepare('SELECT * FROM meal_plan_slots WHERE plan_id = ? ORDER BY date, meal_type')
+    .all(planId) as MealPlanSlotRow[]
+  return rows.map(rowToMealPlanSlot)
+}
+
+// Sets one slot's recipe/skip state in a single call — assigning a recipe,
+// marking skip, and clearing a slot (recipeId null, isSkip false) are all
+// just different values of the same upsert, matching how the drag-drop UI
+// treats them (see MealPlanSlotInput's doc comment). Relies on the
+// UNIQUE(plan_id, date, meal_type) index for the ON CONFLICT upsert — the
+// row always already exists (syncMealPlanSlots pre-creates it), so this is
+// an UPDATE in practice, but INSERT ... ON CONFLICT is the idiomatic
+// better-sqlite3 way to express "set this row's value" without a separate
+// existence check. Returns undefined if the plan itself doesn't exist.
+export function setMealPlanSlot(
+  planId: number,
+  input: MealPlanSlotInput,
+): MealPlanSlot | undefined {
+  if (!getMealPlan(planId)) return undefined
+  db.prepare(`
+    INSERT INTO meal_plan_slots (plan_id, date, meal_type, recipe_id, is_skip)
+    VALUES (@planId, @date, @mealType, @recipeId, @isSkip)
+    ON CONFLICT(plan_id, date, meal_type) DO UPDATE SET recipe_id = excluded.recipe_id, is_skip = excluded.is_skip
+  `).run({
+    planId,
+    date: input.date,
+    mealType: input.mealType,
+    recipeId: input.recipeId,
+    isSkip: input.isSkip ? 1 : 0,
+  })
+  const row = db
+    .prepare('SELECT * FROM meal_plan_slots WHERE plan_id = ? AND date = ? AND meal_type = ?')
+    .get(planId, input.date, input.mealType) as MealPlanSlotRow
+  return rowToMealPlanSlot(row)
+}
+
+export function listMealPlanTrayRecipeIds(planId: number): number[] {
+  const rows = db
+    .prepare('SELECT recipe_id FROM meal_plan_recipes WHERE plan_id = ? ORDER BY recipe_id')
+    .all(planId) as { recipe_id: number }[]
+  return rows.map((r) => r.recipe_id)
+}
+
+// The skip badge is always available (see shared/types/meal-plan.ts) and
+// isn't a recipe, so it never goes through the tray table — only real
+// recipes get manually added here.
+export function addMealPlanTrayRecipe(planId: number, recipeId: number): void {
+  db.prepare('INSERT OR IGNORE INTO meal_plan_recipes (plan_id, recipe_id) VALUES (?, ?)').run(planId, recipeId)
+}
+
+// Removing a recipe from the tray only hides its badge — it doesn't touch
+// any slot already assigned to that recipe (slots reference the recipe
+// directly, not the tray row; see remainingPortions in
+// shared/utils/meal-plan.ts, which reads from slots, not the tray).
+export function removeMealPlanTrayRecipe(planId: number, recipeId: number): void {
+  db.prepare('DELETE FROM meal_plan_recipes WHERE plan_id = ? AND recipe_id = ?').run(planId, recipeId)
 }

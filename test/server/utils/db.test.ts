@@ -1,27 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  addMealPlanTrayRecipe,
+  createMealPlan,
   createRecipe,
   createShoppingList,
   createUser,
+  deleteMealPlan,
   deleteRecipe,
   deleteShoppingList,
   findRecipeByNormalizedName,
   findUserRowByUsername,
+  getMealPlan,
   getRecipe,
   getShoppingList,
+  listMealPlanSlots,
+  listMealPlanTrayRecipeIds,
+  listMealPlans,
   listRecipes,
   listShoppingLists,
   listTags,
   listUsers,
   markExported,
+  removeMealPlanTrayRecipe,
   resetShoppingListItems,
+  setMealPlanSlot,
   setRecipePhoto,
   setShoppingListItemChecked,
   setUserPassword,
   setUserStatus,
+  updateMealPlan,
   updateRecipe,
   updateShoppingListMeta,
 } from '../../../server/utils/db'
+import type { MealPlanInput } from '../../../shared/types/meal-plan'
 import type { RecipeInput } from '../../../shared/types/recipe'
 import type { ShoppingListItem } from '../../../shared/types/shopping-list'
 
@@ -39,9 +50,20 @@ function sampleInput(overrides: Partial<RecipeInput> = {}): RecipeInput {
   }
 }
 
+function sampleMealPlanInput(overrides: Partial<MealPlanInput> = {}): MealPlanInput {
+  return {
+    name: 'Týdenní plán',
+    dateStart: '2026-01-05',
+    dateEnd: '2026-01-07',
+    peopleCount: 3,
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
   for (const recipe of listRecipes()) deleteRecipe(recipe.id)
   for (const list of listShoppingLists('michal')) deleteShoppingList(list.id)
+  for (const plan of listMealPlans()) deleteMealPlan(plan.id)
 })
 
 function sampleItems(overrides: Partial<ShoppingListItem> = {}): ShoppingListItem[] {
@@ -265,5 +287,116 @@ describe('shopping lists db', () => {
 
   it('returns undefined toggling an item on a list that does not exist', () => {
     expect(setShoppingListItemChecked(999999, 'a', true)).toBeUndefined()
+  })
+})
+
+describe('meal plans db', () => {
+  it('creates a plan and pre-creates an empty slot row for every date × meal type in range', () => {
+    const plan = createMealPlan(sampleMealPlanInput())
+
+    expect(plan.name).toBe('Týdenní plán')
+    expect(getMealPlan(plan.id)).toEqual(plan)
+
+    const slots = listMealPlanSlots(plan.id)
+    // 3 days × 3 meal types
+    expect(slots).toHaveLength(9)
+    expect(slots.every((s) => s.recipeId === null && s.isSkip === false)).toBe(true)
+    expect(new Set(slots.map((s) => s.date))).toEqual(new Set(['2026-01-05', '2026-01-06', '2026-01-07']))
+  })
+
+  it('returns undefined fetching a plan that does not exist', () => {
+    expect(getMealPlan(999999)).toBeUndefined()
+  })
+
+  it('lists plans newest date-start first', () => {
+    const earlier = createMealPlan(sampleMealPlanInput({ dateStart: '2026-01-01', dateEnd: '2026-01-01' }))
+    const later = createMealPlan(sampleMealPlanInput({ dateStart: '2026-02-01', dateEnd: '2026-02-01' }))
+
+    expect(listMealPlans().map((p) => p.id)).toEqual([later.id, earlier.id])
+  })
+
+  it('sets a slot to a recipe, then clears it back to empty', () => {
+    const plan = createMealPlan(sampleMealPlanInput())
+
+    const filled = setMealPlanSlot(plan.id, { date: '2026-01-05', mealType: 'lunch', recipeId: 7, isSkip: false })
+    expect(filled?.recipeId).toBe(7)
+    expect(filled?.isSkip).toBe(false)
+
+    const cleared = setMealPlanSlot(plan.id, { date: '2026-01-05', mealType: 'lunch', recipeId: null, isSkip: false })
+    expect(cleared?.recipeId).toBeNull()
+    expect(cleared?.isSkip).toBe(false)
+
+    // Untouched slots stay as they were.
+    expect(listMealPlanSlots(plan.id).filter((s) => s.recipeId !== null || s.isSkip)).toHaveLength(0)
+  })
+
+  it('sets a slot to skip', () => {
+    const plan = createMealPlan(sampleMealPlanInput())
+
+    const skipped = setMealPlanSlot(plan.id, { date: '2026-01-06', mealType: 'breakfast', recipeId: null, isSkip: true })
+
+    expect(skipped?.isSkip).toBe(true)
+    expect(skipped?.recipeId).toBeNull()
+  })
+
+  it('returns undefined setting a slot on a plan that does not exist', () => {
+    expect(setMealPlanSlot(999999, { date: '2026-01-05', mealType: 'lunch', recipeId: 1, isSkip: false })).toBeUndefined()
+  })
+
+  it('re-syncs slots when the date range shrinks, dropping out-of-range assignments', () => {
+    const plan = createMealPlan(sampleMealPlanInput())
+    setMealPlanSlot(plan.id, { date: '2026-01-07', mealType: 'dinner', recipeId: 3, isSkip: false })
+
+    const updated = updateMealPlan(plan.id, sampleMealPlanInput({ dateStart: '2026-01-05', dateEnd: '2026-01-06' }))
+
+    expect(updated?.dateEnd).toBe('2026-01-06')
+    const slots = listMealPlanSlots(plan.id)
+    expect(slots).toHaveLength(6)
+    expect(slots.some((s) => s.date === '2026-01-07')).toBe(false)
+  })
+
+  it('re-syncs slots when the date range grows, adding fresh empty rows', () => {
+    const plan = createMealPlan(sampleMealPlanInput({ dateStart: '2026-01-05', dateEnd: '2026-01-05' }))
+    setMealPlanSlot(plan.id, { date: '2026-01-05', mealType: 'lunch', recipeId: 3, isSkip: false })
+
+    updateMealPlan(plan.id, sampleMealPlanInput({ dateStart: '2026-01-05', dateEnd: '2026-01-06' }))
+
+    const slots = listMealPlanSlots(plan.id)
+    expect(slots).toHaveLength(6)
+    // The pre-existing assignment on the date that stayed in range survives the resync.
+    expect(slots.find((s) => s.date === '2026-01-05' && s.mealType === 'lunch')?.recipeId).toBe(3)
+  })
+
+  it('returns undefined updating a plan that does not exist', () => {
+    expect(updateMealPlan(999999, sampleMealPlanInput())).toBeUndefined()
+  })
+
+  it('deletes a plan along with its slots', () => {
+    const plan = createMealPlan(sampleMealPlanInput())
+
+    expect(deleteMealPlan(plan.id)).toBe(true)
+    expect(getMealPlan(plan.id)).toBeUndefined()
+    expect(listMealPlanSlots(plan.id)).toEqual([])
+  })
+
+  it('returns false deleting a plan that does not exist', () => {
+    expect(deleteMealPlan(999999)).toBe(false)
+  })
+
+  it('adds and removes recipes from the tray without touching slot assignments', () => {
+    const plan = createMealPlan(sampleMealPlanInput())
+    addMealPlanTrayRecipe(plan.id, 1)
+    addMealPlanTrayRecipe(plan.id, 2)
+    // Adding the same recipe twice is a no-op, not a duplicate/error.
+    addMealPlanTrayRecipe(plan.id, 1)
+    setMealPlanSlot(plan.id, { date: '2026-01-05', mealType: 'lunch', recipeId: 1, isSkip: false })
+
+    expect(listMealPlanTrayRecipeIds(plan.id)).toEqual([1, 2])
+
+    removeMealPlanTrayRecipe(plan.id, 1)
+
+    expect(listMealPlanTrayRecipeIds(plan.id)).toEqual([2])
+    // The slot still points at recipe 1 — removing it from the tray only hides the badge.
+    expect(listMealPlanSlots(plan.id).find((s) => s.mealType === 'lunch')?.recipeId).toBe(1)
   })
 })

@@ -13,7 +13,9 @@ const showHeader = computed(
 // The tab bar only makes sense on the tabbed sections themselves — not on
 // the admin/users detour, which stays reachable via the header's
 // "Uživatelé" link and has no tab of its own.
-const showTabs = computed(() => showHeader.value && (route.path === '/' || route.path === '/shopping-list'))
+const showTabs = computed(
+  () => showHeader.value && (route.path === '/' || route.path === '/shopping-list' || route.path === '/meal-plan'),
+)
 
 async function onLogout() {
   await clear()
@@ -86,6 +88,22 @@ function dismissDarkModeToast() {
   --medium: #c98a2e;
   --hard: #a1423a;
 
+  /* Jídelnář (meal plan) recipe colors — a fixed, rotating set so a
+     recipe reads as the same color everywhere it appears on the calendar
+     (its tray badge and every slot it fills) and different recipes are
+     told apart at a glance. Deliberately distinct hues from
+     --easy/--medium/--hard above, which already mean difficulty — see
+     shared/utils/meal-plan.ts's mealPlanColorIndex for how a recipe id
+     maps to one of these. */
+  --mp-color-0: #8656a8;
+  --mp-color-1: #2f8f8a;
+  --mp-color-2: #b8862e;
+  --mp-color-3: #3d6fa8;
+  --mp-color-4: #a8475f;
+  --mp-color-5: #4f8f5c;
+  --mp-color-6: #a85c2e;
+  --mp-color-7: #5c5c99;
+
   color-scheme: light;
 }
 
@@ -106,6 +124,17 @@ function dismissDarkModeToast() {
   --easy: #86a874;
   --medium: #dba653;
   --hard: #c15c52;
+
+  /* Same lift as the rest of this block — lightened for contrast on the
+     dark ground, same hue families. */
+  --mp-color-0: #a878c9;
+  --mp-color-1: #4fb0aa;
+  --mp-color-2: #d9a752;
+  --mp-color-3: #6f9bd9;
+  --mp-color-4: #cc7a8f;
+  --mp-color-5: #7fb08c;
+  --mp-color-6: #d98a52;
+  --mp-color-7: #8a8ad9;
 
   color-scheme: dark;
 }

@@ -1,6 +1,11 @@
 export default defineEventHandler(async (event) => {
   const path = event.path
-  if (!path.startsWith('/api/recipes') && !path.startsWith('/api/admin') && !path.startsWith('/api/shopping-lists')) {
+  if (
+    !path.startsWith('/api/recipes') &&
+    !path.startsWith('/api/admin') &&
+    !path.startsWith('/api/shopping-lists') &&
+    !path.startsWith('/api/meal-plans')
+  ) {
     return
   }
 
@@ -20,7 +25,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Vyžadována administrátorská role' })
   }
 
-  if ((path.startsWith('/api/recipes') || path.startsWith('/api/shopping-lists')) && user.mustChangePassword) {
+  if (
+    (path.startsWith('/api/recipes') || path.startsWith('/api/shopping-lists') || path.startsWith('/api/meal-plans')) &&
+    user.mustChangePassword
+  ) {
     throw createError({ statusCode: 403, statusMessage: 'Nejprve si musíte změnit heslo' })
   }
 })
