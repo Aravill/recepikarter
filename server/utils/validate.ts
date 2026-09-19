@@ -44,8 +44,23 @@ export function parseShoppingListInput(body: unknown): ShoppingListInput {
   if (typeof b?.name !== 'string' || !b.name.trim()) {
     throw createError({ statusCode: 400, statusMessage: 'name is required' })
   }
+
+  // mealPlanId takes precedence when present — the two sources are mutually
+  // exclusive (see ShoppingListInput), and a plan id is unambiguous on its
+  // own, so a stray recipeIds alongside it is just ignored rather than
+  // rejected. `!= null` (not `!== undefined`) so an explicit `mealPlanId:
+  // null` — meaning "no plan" — falls through to the recipeIds branch below
+  // instead of being coerced to 0 and rejected as an invalid id.
+  if (b.mealPlanId != null) {
+    const mealPlanId = Number(b.mealPlanId)
+    if (!Number.isInteger(mealPlanId) || mealPlanId <= 0) {
+      throw createError({ statusCode: 400, statusMessage: 'mealPlanId must be a valid id' })
+    }
+    return { name: b.name.trim(), mealPlanId }
+  }
+
   if (!Array.isArray(b.recipeIds) || !b.recipeIds.length) {
-    throw createError({ statusCode: 400, statusMessage: 'recipeIds is required' })
+    throw createError({ statusCode: 400, statusMessage: 'recipeIds or mealPlanId is required' })
   }
   const recipeIds = b.recipeIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
   if (!recipeIds.length) {
