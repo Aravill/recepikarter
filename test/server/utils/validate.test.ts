@@ -106,6 +106,13 @@ describe('parseShoppingListInput', () => {
       mealPlanId: 5,
     })
   })
+
+  it('falls back to recipeIds when mealPlanId is explicitly null', () => {
+    expect(parseShoppingListInput({ name: 'Nákup', mealPlanId: null, recipeIds: [1, 2] })).toEqual({
+      name: 'Nákup',
+      recipeIds: [1, 2],
+    })
+  })
 })
 
 describe('parseShoppingListPatch', () => {

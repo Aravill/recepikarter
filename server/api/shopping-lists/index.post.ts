@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   const input = parseShoppingListInput(body)
 
   let items: ShoppingListItem[]
-  if (input.mealPlanId) {
+  if ('mealPlanId' in input) {
     const plan = getMealPlan(input.mealPlanId)
     if (!plan) {
       throw createError({ statusCode: 404, statusMessage: 'Meal plan not found' })
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     }
     items = aggregateIngredients(entries).map((item) => ({ ...item, checked: false }))
   } else {
-    const recipes = input.recipeIds!.map((id) => getRecipe(id)).filter((r): r is Recipe => !!r)
+    const recipes = input.recipeIds.map((id) => getRecipe(id)).filter((r): r is Recipe => !!r)
     if (!recipes.length) {
       throw createError({ statusCode: 400, statusMessage: 'No matching recipes to save' })
     }

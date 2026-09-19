@@ -70,7 +70,11 @@ watch(
   { immediate: true },
 )
 
-const { data: mealPlanDetail, pending: mealPlanPending } = await useAsyncData(
+const {
+  data: mealPlanDetail,
+  pending: mealPlanPending,
+  error: mealPlanError,
+} = await useAsyncData(
   'shopping-list-meal-plan',
   () => (mealPlanId.value ? getMealPlan(mealPlanId.value) : Promise.resolve(null)),
   { watch: [mealPlanId] },
@@ -84,6 +88,17 @@ const aggregated = computed(() =>
   mealPlanId.value ? aggregateIngredients(mealPlanEntries.value) : aggregateIngredients(selectedRecipes.value),
 )
 
+// True once loading has settled and there's genuinely nothing to show —
+// the plan/selection this draft pointed at no longer resolves to anything
+// (deleted plan, emptied plan, or all its recipes since deleted). Gates the
+// empty-state message below, which — unlike the loading state — offers a
+// way to discard the stale draft instead of leaving the "resume" prompt
+// stuck reappearing with nothing to resume.
+const ephemeralEmpty = computed(() => {
+  if (mealPlanId.value) return !!mealPlanError.value || !aggregated.value.length
+  return !selectedRecipes.value.length
+})
+
 function lineText(item: AggregatedIngredient): string {
   if (item.kind === 'mass' || item.kind === 'volume') return `${item.displayQuantity} ${item.name}`
   return item.displayQuantity ?? item.name
@@ -92,7 +107,16 @@ function lineText(item: AggregatedIngredient): string {
 // Ticking off items in the ephemeral view is exactly as ephemeral as the
 // single-recipe shopping mode in RecipeCard.vue: navigating away forgets it.
 // Only a *saved* list's checkmarks persist (see below).
-const { items: checked, toggle: toggleChecked } = useToggleSet<string>()
+const { items: checked, toggle: toggleChecked, clear: clearChecked } = useToggleSet<string>()
+
+// Vue Router reuses this same page instance across a query-only navigation
+// (e.g. browser back/forward between an ?ids= link and a ?plan= link, or
+// between two different ?ids= selections) — it doesn't remount just because
+// the source changed. Without this, checkmarks from the previous ephemeral
+// list would carry over into an unrelated one that happens to share an
+// ingredient key. Not `immediate`, so mounting with a set already empty is
+// a no-op rather than an unnecessary clear.
+watch([ids, mealPlanId], () => clearChecked())
 
 // ---- Saved lists: the tab's landing state, and what "save" produces ----
 const {
@@ -311,8 +335,15 @@ function formatDate(iso: string) {
       <h1>Nákupák</h1>
 
       <p v-if="pending || mealPlanPending" class="empty">Načítám…</p>
-      <p v-else-if="mealPlanId && !aggregated.length" class="empty">Jídelnář nemá žádné naplánované recepty.</p>
-      <p v-else-if="!mealPlanId && !selectedRecipes.length" class="empty">Nebyly vybrány žádné recepty.</p>
+
+      <template v-else-if="ephemeralEmpty">
+        <p class="empty">
+          <template v-if="mealPlanError">Plán nebyl nalezen — možná byl mezitím smazán.</template>
+          <template v-else-if="mealPlanId">Jídelnář nemá žádné naplánované recepty.</template>
+          <template v-else>Nebyly vybrány žádné recepty.</template>
+        </p>
+        <button type="button" class="discard-btn" @click="discardDraft">Zahodit</button>
+      </template>
 
       <template v-else>
         <p v-if="mealPlanId" class="source-recipes">Z jídelnáře „{{ mealPlanDetail?.plan.name }}“</p>

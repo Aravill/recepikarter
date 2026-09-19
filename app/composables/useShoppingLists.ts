@@ -8,7 +8,7 @@ export function useShoppingLists() {
   const listShoppingLists = () => $fetch<ShoppingList[]>('/api/shopping-lists', { headers })
   // source is mutually exclusive, matching ShoppingListInput server-side —
   // either the recipes an ephemeral ?ids= view picked, or the meal plan a
-  // ?plan= view derived its (scaled) items from.
+  // ?plan= view derived its items from.
   const saveShoppingList = (name: string, source: { recipeIds: number[] } | { mealPlanId: number }) =>
     $fetch<ShoppingList>('/api/shopping-lists', { method: 'POST', body: { name, ...source }, headers })
   const renameShoppingList = (id: number, name: string) =>
