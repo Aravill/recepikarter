@@ -71,8 +71,8 @@ describe('parseShoppingListInput', () => {
     expect(() => parseShoppingListInput({ recipeIds: [1] })).toThrow('name is required')
   })
 
-  it('rejects missing recipeIds', () => {
-    expect(() => parseShoppingListInput({ name: 'Nákup' })).toThrow('recipeIds is required')
+  it('rejects missing recipeIds and mealPlanId', () => {
+    expect(() => parseShoppingListInput({ name: 'Nákup' })).toThrow('recipeIds or mealPlanId is required')
   })
 
   it('rejects recipeIds with no valid ids', () => {
@@ -85,6 +85,25 @@ describe('parseShoppingListInput', () => {
     expect(parseShoppingListInput({ name: 'Nákup', recipeIds: [1, 'x', -1] })).toEqual({
       name: 'Nákup',
       recipeIds: [1],
+    })
+  })
+
+  it('parses a mealPlanId, coercing it to a number', () => {
+    expect(parseShoppingListInput({ name: 'Z jídelnáře', mealPlanId: '5' })).toEqual({
+      name: 'Z jídelnáře',
+      mealPlanId: 5,
+    })
+  })
+
+  it('rejects an invalid mealPlanId', () => {
+    expect(() => parseShoppingListInput({ name: 'Nákup', mealPlanId: 0 })).toThrow('mealPlanId must be a valid id')
+    expect(() => parseShoppingListInput({ name: 'Nákup', mealPlanId: 'x' })).toThrow('mealPlanId must be a valid id')
+  })
+
+  it('prefers mealPlanId over recipeIds when both are given', () => {
+    expect(parseShoppingListInput({ name: 'Nákup', mealPlanId: 5, recipeIds: [1, 2] })).toEqual({
+      name: 'Nákup',
+      mealPlanId: 5,
     })
   })
 })

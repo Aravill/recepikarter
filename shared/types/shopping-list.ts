@@ -23,9 +23,14 @@ export interface ShoppingList {
   updatedAt: string
 }
 
-// What POST /api/shopping-lists takes: a name plus the recipe ids to
-// aggregate server-side into the snapshot (see server/utils/validate.ts).
+// What POST /api/shopping-lists takes: a name plus either an explicit set of
+// recipe ids (the ephemeral ?ids= view in app/pages/shopping-list.vue) or a
+// meal plan to derive scaled recipe quantities from (its ?plan= view) —
+// never both. See server/utils/validate.ts's parseShoppingListInput, which
+// enforces that, and mealPlanShoppingEntries (shared/utils/meal-plan.ts) for
+// how a plan turns into recipe quantities.
 export interface ShoppingListInput {
   name: string
-  recipeIds: number[]
+  recipeIds?: number[]
+  mealPlanId?: number
 }
