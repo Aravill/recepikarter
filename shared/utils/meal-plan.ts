@@ -90,3 +90,26 @@ export function mealPlanColorIndex(recipeId: number): number {
 export function mealPlanSlotKey(date: string, mealType: MealType): string {
   return `${date}|${mealType}`
 }
+
+// Turns a plan's slots into aggregateIngredients (shared/utils/
+// ingredient-parser.ts) input: the distinct recipes assigned to at least one
+// non-skip slot, each contributing its own ingredients exactly once — see
+// server/api/shopping-lists/index.post.ts and app/pages/shopping-list.vue's
+// ?plan= view, which both feed this straight into it. A recipe's card
+// covers its own servings regardless of how many slots it's dragged into;
+// remainingPortions/mealPlanBadgeState above already track whether that's
+// enough to cover them (the tray badge's "zbytek"/"vyčerpáno"), so the
+// ingredient list itself is never multiplied by slot count — dragging the
+// same recipe onto 3 slots means "3 of its portions are spoken for", not
+// "cook it 3 times". Slots pointing at a since-deleted recipe are silently
+// skipped, same as the calendar grid does (see recipeById.get(...) in
+// app/pages/meal-plan.vue).
+export function mealPlanShoppingEntries(slots: MealPlanSlot[], recipes: Recipe[]): Recipe[] {
+  const recipeById = new Map(recipes.map((r) => [r.id, r]))
+  const usedRecipeIds = new Set<number>()
+  for (const slot of slots) {
+    if (slot.isSkip || slot.recipeId === null) continue
+    usedRecipeIds.add(slot.recipeId)
+  }
+  return [...usedRecipeIds].map((id) => recipeById.get(id)).filter((r): r is Recipe => !!r)
+}

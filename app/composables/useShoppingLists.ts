@@ -6,8 +6,11 @@ export function useShoppingLists() {
   const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined
 
   const listShoppingLists = () => $fetch<ShoppingList[]>('/api/shopping-lists', { headers })
-  const saveShoppingList = (name: string, recipeIds: number[]) =>
-    $fetch<ShoppingList>('/api/shopping-lists', { method: 'POST', body: { name, recipeIds }, headers })
+  // source is mutually exclusive, matching ShoppingListInput server-side —
+  // either the recipes an ephemeral ?ids= view picked, or the meal plan a
+  // ?plan= view derived its items from.
+  const saveShoppingList = (name: string, source: { recipeIds: number[] } | { mealPlanId: number }) =>
+    $fetch<ShoppingList>('/api/shopping-lists', { method: 'POST', body: { name, ...source }, headers })
   const renameShoppingList = (id: number, name: string) =>
     $fetch<ShoppingList>(`/api/shopping-lists/${id}`, { method: 'PATCH', body: { name }, headers })
   const setShoppingListShared = (id: number, shared: boolean) =>

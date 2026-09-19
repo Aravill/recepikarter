@@ -193,6 +193,18 @@ const missing = computed(() =>
   detail.value ? mealPlanMissingCount(detail.value.slots, detail.value.plan.peopleCount) : { slots: 0, portions: 0 },
 )
 
+// Gates the "Nákupní seznam z jídelnáře" button — nothing to aggregate from
+// a plan with no recipes assigned yet.
+const hasPlannedRecipes = computed(() => (detail.value?.slots ?? []).some((s) => s.recipeId !== null))
+
+// Hands off to app/pages/shopping-list.vue's ?plan= view (see
+// mealPlanShoppingEntries in shared/utils/meal-plan.ts) — this page only
+// needs to link there, not compute the list itself.
+function goToMealPlanShoppingList() {
+  if (!planId.value) return
+  router.push({ path: '/shopping-list', query: { plan: String(planId.value) } })
+}
+
 function formatDateLabel(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString('cs', { weekday: 'short', day: 'numeric', month: 'numeric' })
 }
@@ -406,9 +418,19 @@ function formatDate(iso: string) {
           </div>
         </form>
 
-        <div class="missing-counter" :class="{ done: missing.portions === 0 }">
-          <template v-if="missing.portions === 0">Vše naplánováno</template>
-          <template v-else>{{ missing.slots }} {{ missing.slots === 1 ? 'jídlo' : 'jídel' }} · {{ missing.portions }} porcí chybí</template>
+        <div class="plan-toolbar">
+          <div class="missing-counter" :class="{ done: missing.portions === 0 }">
+            <template v-if="missing.portions === 0">Vše naplánováno</template>
+            <template v-else>{{ missing.slots }} {{ missing.slots === 1 ? 'jídlo' : 'jídel' }} · {{ missing.portions }} porcí chybí</template>
+          </div>
+          <button
+            v-if="hasPlannedRecipes"
+            type="button"
+            class="btn-secondary shopping-list-btn"
+            @click="goToMealPlanShoppingList"
+          >
+            Nákupní seznam z jídelnáře
+          </button>
         </div>
 
         <div class="grid" @dragover="onCellDragOver">
@@ -714,12 +736,21 @@ h1 {
   cursor: default;
 }
 
+.plan-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding-bottom: 14px;
+}
+
 .missing-counter {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 13px;
   font-weight: 600;
   color: var(--accent);
-  padding: 4px 0 14px;
+  padding: 4px 0;
 }
 
 .missing-counter.done {

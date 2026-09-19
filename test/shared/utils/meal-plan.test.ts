@@ -4,6 +4,7 @@ import {
   mealPlanColorIndex,
   mealPlanDateRange,
   mealPlanMissingCount,
+  mealPlanShoppingEntries,
   parseServingsCount,
   remainingPortions,
 } from '../../../shared/utils/meal-plan'
@@ -135,6 +136,49 @@ describe('mealPlanMissingCount', () => {
   it('is zero when every slot is filled or skipped', () => {
     const slots = [sampleSlot({ isSkip: true }), sampleSlot({ recipeId: 1, mealType: 'dinner' })]
     expect(mealPlanMissingCount(slots, 4)).toEqual({ slots: 0, portions: 0 })
+  })
+})
+
+describe('mealPlanShoppingEntries', () => {
+  it('includes a recipe used across several slots exactly once, not multiplied', () => {
+    const recipe = sampleRecipe({ id: 1, name: 'Guláš', servings: '4', ingredients: ['400 g hovězího'] })
+    const slots = [
+      sampleSlot({ recipeId: 1, mealType: 'lunch' }),
+      sampleSlot({ recipeId: 1, mealType: 'dinner' }),
+    ]
+    expect(mealPlanShoppingEntries(slots, [recipe])).toEqual([recipe])
+  })
+
+  it('does not scale by peopleCount vs. servings at all', () => {
+    const recipe = sampleRecipe({ id: 1, servings: '2', ingredients: ['1 bageta'] })
+    const slots = [sampleSlot({ recipeId: 1 })]
+    expect(mealPlanShoppingEntries(slots, [recipe])).toEqual([recipe])
+  })
+
+  it('ignores skip slots and empty slots', () => {
+    const recipe = sampleRecipe({ id: 1 })
+    const slots = [
+      sampleSlot({ recipeId: null, isSkip: true }),
+      sampleSlot({ recipeId: null, isSkip: false, mealType: 'dinner' }),
+    ]
+    expect(mealPlanShoppingEntries(slots, [recipe])).toEqual([])
+  })
+
+  it('skips a slot whose recipe has since been deleted', () => {
+    const slots = [sampleSlot({ recipeId: 99 })]
+    expect(mealPlanShoppingEntries(slots, [])).toEqual([])
+  })
+
+  it('produces one entry per distinct recipe, even across different meal types/dates', () => {
+    const a = sampleRecipe({ id: 1, name: 'A' })
+    const b = sampleRecipe({ id: 2, name: 'B' })
+    const slots = [
+      sampleSlot({ recipeId: 1, mealType: 'breakfast' }),
+      sampleSlot({ recipeId: 2, mealType: 'lunch' }),
+      sampleSlot({ recipeId: 1, mealType: 'dinner', date: '2026-01-02' }),
+    ]
+    const result = mealPlanShoppingEntries(slots, [a, b])
+    expect(result.map((r) => r.id).sort()).toEqual([1, 2])
   })
 })
 
