@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { aggregateIngredients } from '#shared/utils/ingredient-parser'
 import type { AggregatedIngredient } from '#shared/utils/ingredient-parser'
+import { mealPlanShoppingEntries } from '#shared/utils/meal-plan'
 import type { ShoppingList, ShoppingListItem } from '#shared/types/shopping-list'
 
 const route = useRoute()
 const router = useRouter()
 const { user } = useUserSession()
 const { listRecipes } = useRecipes()
+const { getMealPlan } = useMealPlans()
 const {
   listShoppingLists,
   saveShoppingList,
@@ -16,6 +18,7 @@ const {
   resetShoppingList,
   setShoppingListItemChecked,
 } = useShoppingLists()
+const { loadDraft, saveDraft, clearDraft } = useShoppingListDraft()
 
 // ---- Ephemeral ?ids=... view: combine several recipes on the fly ----
 // Same key as app/pages/index.vue: hits Nuxt's payload cache when arriving
@@ -41,7 +44,45 @@ const selectedRecipes = computed(() => {
   return (recipes.value ?? []).filter((r) => idSet.has(r.id))
 })
 
-const aggregated = computed(() => aggregateIngredients(selectedRecipes.value))
+// ---- Ephemeral ?plan=... view: a meal plan's slots, summed as authored ----
+// Same shape as ?ids= above — a query param survives reload/direct link —
+// but sourced from app/pages/meal-plan.vue's "Nákupní seznam z jídelnáře"
+// button instead of app/pages/index.vue's cart. Mutually exclusive with
+// ?ids= in practice (that button never sets both).
+const mealPlanId = computed<number | null>(() => {
+  const raw = route.query.plan
+  const n = Number(Array.isArray(raw) ? raw[0] : raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+})
+
+// ---- Unsaved-list draft: survives a closed tab, like a recipe-edit draft
+// (see useShoppingListDraft.ts) ----
+// Whichever ephemeral view (?ids= or ?plan=) is open gets remembered as the
+// draft, so a reopened tab can offer to continue it (see hasPendingDraft
+// below) instead of just landing on the saved-lists list. Only the source
+// is stored, not the computed items — those are always recomputed live.
+watch(
+  [ids, mealPlanId],
+  ([currentIds, currentPlanId]) => {
+    if (currentPlanId) saveDraft({ mealPlanId: currentPlanId })
+    else if (currentIds.length) saveDraft({ recipeIds: currentIds })
+  },
+  { immediate: true },
+)
+
+const { data: mealPlanDetail, pending: mealPlanPending } = await useAsyncData(
+  'shopping-list-meal-plan',
+  () => (mealPlanId.value ? getMealPlan(mealPlanId.value) : Promise.resolve(null)),
+  { watch: [mealPlanId] },
+)
+
+const mealPlanEntries = computed(() =>
+  mealPlanDetail.value ? mealPlanShoppingEntries(mealPlanDetail.value.slots, recipes.value ?? []) : [],
+)
+
+const aggregated = computed(() =>
+  mealPlanId.value ? aggregateIngredients(mealPlanEntries.value) : aggregateIngredients(selectedRecipes.value),
+)
 
 function lineText(item: AggregatedIngredient): string {
   if (item.kind === 'mass' || item.kind === 'volume') return `${item.displayQuantity} ${item.name}`
@@ -78,6 +119,28 @@ const isOwner = computed(() => !!openList.value && openList.value.ownerUsername 
 
 function closeOpenList() {
   openListId.value = null
+}
+
+// ---- Unsaved-list draft, continued: offering to resume it on landing ----
+// Read in onMounted, not at setup: the draft lives in localStorage, which
+// SSR can't see, and rendering the hint server-side would mismatch (same
+// reasoning as hasPendingDraft in app/pages/index.vue).
+const hasPendingDraft = ref(false)
+onMounted(() => {
+  hasPendingDraft.value = loadDraft() !== null
+})
+
+function resumeDraft() {
+  const draft = loadDraft()
+  if (!draft) return
+  const query = 'mealPlanId' in draft ? { plan: String(draft.mealPlanId) } : { ids: draft.recipeIds.join(',') }
+  router.push({ path: '/shopping-list', query })
+}
+
+function discardDraft() {
+  clearDraft()
+  hasPendingDraft.value = false
+  router.replace({ query: {} })
 }
 
 function replaceSavedList(updated: ShoppingList) {
@@ -129,12 +192,17 @@ async function onSave() {
   saveError.value = ''
   saving.value = true
   try {
-    const created = await saveShoppingList(name, ids.value)
+    const created = mealPlanId.value
+      ? await saveShoppingList(name, { mealPlanId: mealPlanId.value })
+      : await saveShoppingList(name, { recipeIds: ids.value })
     savedLists.value = [created, ...(savedLists.value ?? [])]
     saveFormOpen.value = false
-    // Also drops ?ids= (the setter replaces the whole query) now that the
-    // list lives under its own id — otherwise the ephemeral view would keep
-    // showing instead of the list just saved.
+    // The list lives under its own id now — the draft it came from is spent.
+    clearDraft()
+    hasPendingDraft.value = false
+    // Also drops ?ids=/?plan= (the setter replaces the whole query) now that
+    // the list lives under its own id — otherwise the ephemeral view would
+    // keep showing instead of the list just saved.
     openListId.value = created.id
     showToast('Seznam byl uložen.')
   } catch (e) {
@@ -239,19 +307,22 @@ function formatDate(iso: string) {
 
 <template>
   <div class="shopping-list-page">
-    <template v-if="ids.length">
+    <template v-if="ids.length || mealPlanId">
       <h1>Nákupák</h1>
 
-      <p v-if="pending" class="empty">Načítám…</p>
-      <p v-else-if="!selectedRecipes.length" class="empty">Nebyly vybrány žádné recepty.</p>
+      <p v-if="pending || mealPlanPending" class="empty">Načítám…</p>
+      <p v-else-if="mealPlanId && !aggregated.length" class="empty">Jídelnář nemá žádné naplánované recepty.</p>
+      <p v-else-if="!mealPlanId && !selectedRecipes.length" class="empty">Nebyly vybrány žádné recepty.</p>
 
       <template v-else>
-        <p class="source-recipes">Z receptů: {{ selectedRecipes.map((r) => r.name).join(', ') }}</p>
+        <p v-if="mealPlanId" class="source-recipes">Z jídelnáře „{{ mealPlanDetail?.plan.name }}“</p>
+        <p v-else class="source-recipes">Z receptů: {{ selectedRecipes.map((r) => r.name).join(', ') }}</p>
 
         <div class="save-row">
-          <button v-if="!saveFormOpen" type="button" class="btn-primary" @click="openSaveForm">
-            Uložit seznam
-          </button>
+          <template v-if="!saveFormOpen">
+            <button type="button" class="btn-primary" @click="openSaveForm">Uložit seznam</button>
+            <button type="button" class="discard-btn" @click="discardDraft">Zahodit</button>
+          </template>
           <form v-else class="save-form" @submit.prevent="onSave">
             <div class="field">
               <label for="sl-name">Název seznamu</label>
@@ -341,6 +412,10 @@ function formatDate(iso: string) {
     <template v-else>
       <h1>Nákupák</h1>
 
+      <button v-if="hasPendingDraft" type="button" class="btn-primary resume-draft-btn" @click="resumeDraft">
+        ✎ Pokračovat v nedokončeném nákupu
+      </button>
+
       <p v-if="savedListsPending" class="empty">Načítám…</p>
       <p v-else-if="!savedLists?.length" class="empty">
         Zatím nemáte žádné uložené seznamy. Vyberte recepty v Galerii a uložte je jako nákupní seznam.
@@ -415,7 +490,31 @@ h1 {
 }
 
 .save-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding-bottom: 14px;
+}
+
+.discard-btn {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.discard-btn:hover {
+  color: var(--hard);
+}
+
+.resume-draft-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 14px;
+  text-align: center;
 }
 
 .save-form {
