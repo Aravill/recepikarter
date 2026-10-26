@@ -20,6 +20,14 @@ const THUMB_MAX_PX = 600
 const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 export const PHOTO_MAX_BYTES = 15 * 1024 * 1024
 
+// The MIME check above trusts the browser, but sharp sniffs the actual
+// bytes and would happily hand an SVG/TIFF/GIF/... renamed to .jpg to the
+// matching libvips loader — each one more parser exposed to uploads (e.g.
+// librsvg for SVG). Disable every loader except the three accepted formats,
+// process-wide, so anything else fails in storeRecipePhoto.
+sharp.block({ operation: ['VipsForeignLoad'] })
+sharp.unblock({ operation: ['VipsForeignLoadJpeg', 'VipsForeignLoadPng', 'VipsForeignLoadWebp'] })
+
 export function isPhotoMimeType(type: string | undefined): boolean {
   return !!type && PHOTO_MIME_TYPES.includes(type)
 }
