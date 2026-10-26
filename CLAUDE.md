@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Stack
 
-Nuxt 4 (Vue 3 + Nitro), TypeScript throughout. `better-sqlite3` for storage — no ORM, no migration system; schema lives inline in `server/utils/db.ts` as `CREATE TABLE IF NOT EXISTS`. Auth is `nuxt-auth-utils` session cookies for a single hardcoded household account (no multi-tenant accounts, no OAuth).
+Nuxt 4 (Vue 3 + Nitro), TypeScript throughout. `better-sqlite3` for storage — no ORM, no migration system; schema lives inline in `server/utils/db.ts` as `CREATE TABLE IF NOT EXISTS`. Auth is `nuxt-auth-utils` session cookies: one env-configured admin account plus admin-created DB users (no self-registration, no OAuth).
 
 Linting (ESLint via `@nuxt/eslint`) and unit testing (Vitest) are configured; there is no formatter/format script. Don't assume beyond that — check before referencing a command.
 
@@ -19,6 +19,8 @@ Linting (ESLint via `@nuxt/eslint`) and unit testing (Vitest) are configured; th
 ## Gotchas
 
 - **`AUTH_PASSWORD_HASH` must stay base64-encoded.** The raw scrypt hash is PHC format (`$scrypt$n=...,r=...,p=...$salt$hash`) and both Docker Compose's `.env` parser and `source .env` treat bare `$` as a variable reference, silently corrupting it. Always regenerate via `npm run hash-password`.
+- **Every authenticated request re-validates the session against current state.** `requireActiveSession` (`server/utils/auth.ts`) compares the session's `secure.credentialVersion` with `users.session_version` (bumped by `setUserPassword`) or, for the admin, a fingerprint of `AUTH_PASSWORD_HASH`. Any new place that issues a session must stamp that version (use `replaceUserSession` like `login.post.ts`), or the session is rejected on the next request. Sessions also expire 30 days after login (`runtimeConfig.session.maxAge`).
+- **The session cookie is `Secure`.** HTTPS is terminated by Caddy in front of the container; logging in over plain `http://<lan-ip>:3000` silently fails unless `NUXT_SESSION_COOKIE_SECURE=false` (`http://localhost` still works — browsers exempt it).
 - **SSR fetches must forward cookies explicitly.** `$fetch` calls made server-side (e.g. in composables like `app/composables/useRecipes.ts`) don't forward cookies automatically — pass `useRequestHeaders(['cookie'])` or the request 401s.
 - **Category/difficulty storage values are English; UI labels are Czech.** `shared/types/recipe.ts` deliberately decouples the two (`CATEGORIES`/`DIFFICULTIES` enums vs. `CATEGORY_LABELS`/`DIFFICULTY_LABELS` maps) — don't collapse them.
 - **Card accent color is derived from difficulty, not category**, but `docs/design-system.md` still flags this as an unresolved naming/logic inconsistency (`CATEGORY_COLORS` vs. difficulty-derived color). Treat it as a known open TODO, not settled behavior, if touching card color logic.
@@ -34,6 +36,6 @@ Linting (ESLint via `@nuxt/eslint`) and unit testing (Vitest) are configured; th
 - API routes use Nitro's HTTP-method-suffix convention (`index.get.ts`, `[id].put.ts`, etc.), not an Express-style router.
 - `/recipes/new` is handled inside `app/pages/recipes/[id].vue` by treating the literal string `"new"` as `route.params.id`, rather than a separate route.
 - UI copy is Czech (`lang="cs"`); code/identifiers stay in English.
-- Env vars: `AUTH_USERNAME`, `AUTH_PASSWORD_HASH` (see gotcha above), `NUXT_SESSION_PASSWORD` are required — see `.env.example`. `RECIPE_DB_PATH` is an optional override for the SQLite file location (defaults to `./data/recipes.sqlite`), not listed in `.env.example`; `RECIPE_PHOTOS_DIR` does the same for uploaded recipe photos (defaults to `./data/photos`).
-- Deployment is manual: `docker compose up -d --build` on a self-hosted home server. No CI/CD, no reverse proxy config in this repo.
+- Env vars: `AUTH_USERNAME`, `AUTH_PASSWORD_HASH` (see gotcha above), `NUXT_SESSION_PASSWORD` are required — see `.env.example`. `RECIPE_DB_PATH` is an optional override for the SQLite file location (defaults to `./data/recipes.sqlite`), not listed in `.env.example`; `RECIPE_PHOTOS_DIR` does the same for uploaded recipe photos (defaults to `./data/photos`). `BIND_ADDRESS` (default `127.0.0.1`) / `PORT` set where docker compose publishes the app, and `NUXT_SESSION_COOKIE_SECURE` (see gotcha above) — these three are in `.env.example` commented out.
+- Deployment: `docker compose up -d --build` on a self-hosted home server, run automatically by `.github/workflows/deploy.yml` (self-hosted runner) on every push to `main`. A Caddy reverse proxy on that host terminates HTTPS; its config isn't in this repo.
 - Use feature branches + PRs for new work going forward, even though earlier history committed directly to `main`.
