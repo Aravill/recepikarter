@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AppUser } from '#shared/types/user'
+import { PASSWORD_MIN_LENGTH, generateTempPassword } from '#shared/utils/password-policy'
 
 const { listUsers, createUser, blockUser, unblockUser } = useAdminUsers()
 const { data: users, refresh } = await useAsyncData('admin-users', () => listUsers())
@@ -12,12 +13,8 @@ const createError = ref('')
 const justCreated = ref<{ username: string; tempPassword: string } | null>(null)
 const togglingId = ref<number | null>(null)
 
-const TEMP_PASSWORD_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
-
 function generatePassword() {
-  const bytes = new Uint8Array(10)
-  crypto.getRandomValues(bytes)
-  newTempPassword.value = Array.from(bytes, (b) => TEMP_PASSWORD_ALPHABET[b % TEMP_PASSWORD_ALPHABET.length]).join('')
+  newTempPassword.value = generateTempPassword(newUsername.value.trim())
 }
 
 function openForm() {
@@ -92,6 +89,9 @@ function formatDate(iso: string) {
           <input id="u-temp-password" v-model="newTempPassword" type="text" placeholder="Necháte-li prázdné, vygeneruje se" />
           <button type="button" class="generate-btn" @click="generatePassword">Vygenerovat</button>
         </div>
+        <p class="field-hint">
+          Alespoň {{ PASSWORD_MIN_LENGTH }} znaků, malé i velké písmeno a číslice; nesmí obsahovat uživatelské jméno.
+        </p>
       </div>
       <p v-if="createError" class="form-error">{{ createError }}</p>
       <div class="form-actions">
@@ -251,6 +251,12 @@ function formatDate(iso: string) {
   border: 1px solid var(--rule);
   background: var(--surface);
   color: var(--surface-ink);
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--surface-ink-dim);
 }
 
 .password-row {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PASSWORD_MAX_LENGTH, PASSWORD_RULES, passwordPolicyMessage, passwordPolicyViolations } from '#shared/utils/password-policy'
+
 const { fetch: refreshSession, user } = useUserSession()
 
 const currentPassword = ref('')
@@ -7,8 +9,19 @@ const confirmPassword = ref('')
 const error = ref('')
 const submitting = ref(false)
 
+// Live checklist under the new-password field — the same rules the API
+// enforces (see shared/utils/password-policy.ts).
+const ruleStates = computed(() =>
+  PASSWORD_RULES.map((rule) => ({ label: rule.label, ok: rule.test(newPassword.value, user.value?.username ?? '') })),
+)
+
 async function onSubmit() {
   error.value = ''
+  const violations = passwordPolicyViolations(newPassword.value, user.value?.username ?? '')
+  if (violations.length) {
+    error.value = passwordPolicyMessage(violations)
+    return
+  }
   if (newPassword.value !== confirmPassword.value) {
     error.value = 'Nová hesla se neshodují.'
     return
@@ -44,7 +57,17 @@ async function onSubmit() {
       </div>
       <div class="field">
         <label for="cp-new">Nové heslo</label>
-        <input id="cp-new" v-model="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+        <input
+          id="cp-new"
+          v-model="newPassword"
+          type="password"
+          autocomplete="new-password"
+          :maxlength="PASSWORD_MAX_LENGTH"
+          required
+        />
+        <ul class="password-rules" aria-label="Požadavky na heslo">
+          <li v-for="rule in ruleStates" :key="rule.label" :class="{ ok: rule.ok }">{{ rule.label }}</li>
+        </ul>
       </div>
       <div class="field">
         <label for="cp-confirm">Nové heslo znovu</label>
@@ -53,7 +76,7 @@ async function onSubmit() {
           v-model="confirmPassword"
           type="password"
           autocomplete="new-password"
-          minlength="8"
+          :maxlength="PASSWORD_MAX_LENGTH"
           required
         />
       </div>
@@ -127,6 +150,29 @@ async function onSubmit() {
 .field input:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.password-rules {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--surface-ink-dim);
+}
+
+.password-rules li::before {
+  content: '○ ';
+}
+
+.password-rules li.ok {
+  color: var(--easy);
+}
+
+.password-rules li.ok::before {
+  content: '✓ ';
 }
 
 .change-password-error {

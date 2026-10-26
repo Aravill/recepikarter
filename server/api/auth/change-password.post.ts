@@ -12,9 +12,7 @@ export default defineEventHandler(async (event) => {
   const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : ''
   const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : ''
 
-  if (newPassword.length < 8) {
-    throw createError({ statusCode: 400, statusMessage: 'Nové heslo musí mít alespoň 8 znaků' })
-  }
+  assertPasswordPolicy(newPassword, user.username)
 
   const row = findUserRowByUsername(user.username)
   if (!row || row.status === 'blocked') {
@@ -24,6 +22,9 @@ export default defineEventHandler(async (event) => {
   const valid = await verifyPassword(row.password_hash, currentPassword)
   if (!valid) {
     throw createError({ statusCode: 401, statusMessage: 'Současné heslo není správné' })
+  }
+  if (newPassword === currentPassword) {
+    throw createError({ statusCode: 400, statusMessage: 'Nové heslo se musí lišit od současného' })
   }
 
   const newHash = await hashPassword(newPassword)
