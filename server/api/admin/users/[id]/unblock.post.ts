@@ -1,4 +1,5 @@
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
+  await requireAdminSession(event)
   const id = Number(getRouterParam(event, 'id'))
   const user = setUserStatus(id, 'active')
   if (!user) {

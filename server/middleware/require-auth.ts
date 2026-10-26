@@ -11,6 +11,8 @@ export default defineEventHandler(async (event) => {
 
   const { user } = await requireActiveSession(event)
 
+  // Admin routes also call requireAdminSession themselves, so they don't
+  // depend on this prefix match alone.
   if (path.startsWith('/api/admin') && user.role !== 'admin') {
     throw createError({ statusCode: 403, statusMessage: 'Vyžadována administrátorská role' })
   }

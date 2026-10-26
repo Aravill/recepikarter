@@ -6,6 +6,7 @@ import { generateTempPassword } from '#shared/utils/password-policy'
 // created with mustChangePassword already set (see createUser in
 // server/utils/db.ts), so that password only works to log in once.
 export default defineEventHandler(async (event) => {
+  await requireAdminSession(event)
   const body = await readBody(event)
   const username = parseUsername(body?.username)
 
