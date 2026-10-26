@@ -10,6 +10,9 @@ export default defineNuxtConfig({
       // in front (see CLAUDE.md), so Secure would make login look like it
       // works (200 OK) while never actually setting the cookie.
       cookie: { secure: false },
+      // Absolute lifetime (h3 counts from login, not last use): a stolen
+      // cookie stops working after 30 days at the latest.
+      maxAge: 60 * 60 * 24 * 30,
     },
   },
   app: {

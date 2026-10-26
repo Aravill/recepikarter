@@ -8,6 +8,15 @@ declare module '#auth-utils' {
     // set for them. Always false for the admin account.
     mustChangePassword: boolean
   }
+
+  // Server-only (never sent to the client by /api/_auth/session).
+  interface SecureSessionData {
+    // Which credentials this session was issued against: the user row's
+    // session_version, or for the admin a fingerprint of AUTH_PASSWORD_HASH.
+    // A mismatch on a later request means the password changed since —
+    // see requireActiveSession in server/utils/auth.ts.
+    credentialVersion: string
+  }
 }
 
 export {}
