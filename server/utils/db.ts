@@ -392,6 +392,11 @@ function findUserRowById(id: number): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
 }
 
+export function getUser(id: number): AppUser | undefined {
+  const row = findUserRowById(id)
+  return row ? rowToUser(row) : undefined
+}
+
 export function createUser(username: string, passwordHash: string): AppUser {
   const now = new Date().toISOString()
   // A freshly admin-created account always starts as must-change-password —
