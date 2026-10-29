@@ -2,10 +2,6 @@
 // app/pages/change-password.vue) and any later voluntary change — same
 // endpoint either way, gated only by requiring the current password.
 
-// The current-password check is a guessing oracle for whoever holds the
-// session (e.g. a stolen cookie), so it's throttled like login.
-const currentPasswordLimiter = createFailureLimiter({ maxFailures: 5, windowMs: 15 * 60 * 1000 })
-
 export default defineEventHandler(async (event) => {
   const { user } = await requireActiveSession(event)
 

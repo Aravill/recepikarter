@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { AppUser } from '#shared/types/user'
+import type { AdminUser, AppUser } from '#shared/types/user'
 import { PASSWORD_MIN_LENGTH, generateTempPassword } from '#shared/utils/password-policy'
 
-const { listUsers, createUser, blockUser, unblockUser, resetPassword } = useAdminUsers()
+const { listUsers, createUser, blockUser, unblockUser, resetPassword, unlockUser } = useAdminUsers()
 const { data: users, refresh } = await useAsyncData('admin-users', () => listUsers())
 
 const formOpen = ref(false)
@@ -15,7 +15,8 @@ const createError = ref('')
 const issuedPassword = ref<{ username: string; tempPassword: string; reset: boolean } | null>(null)
 const togglingId = ref<number | null>(null)
 const resettingId = ref<number | null>(null)
-const resetError = ref('')
+const unlockingId = ref<number | null>(null)
+const actionError = ref('')
 
 function generatePassword() {
   newTempPassword.value = generateTempPassword(newUsername.value.trim())
@@ -68,7 +69,7 @@ async function onResetPassword(user: AppUser) {
     )
   )
     return
-  resetError.value = ''
+  actionError.value = ''
   resettingId.value = user.id
   try {
     const { tempPassword } = await resetPassword(user.id)
@@ -76,10 +77,36 @@ async function onResetPassword(user: AppUser) {
     await refresh()
   } catch (e) {
     const err = e as { data?: { statusMessage?: string } }
-    resetError.value = err?.data?.statusMessage || 'Reset hesla se nezdařil.'
+    actionError.value = err?.data?.statusMessage || 'Reset hesla se nezdařil.'
   } finally {
     resettingId.value = null
   }
+}
+
+// The lockout is a server-side snapshot from when the list loaded; past
+// that time it has lapsed on its own, so stop showing it.
+function lockedUntil(user: AdminUser): Date | null {
+  if (!user.loginLockedUntil) return null
+  const until = new Date(user.loginLockedUntil)
+  return until.getTime() > Date.now() ? until : null
+}
+
+async function onUnlock(user: AdminUser) {
+  actionError.value = ''
+  unlockingId.value = user.id
+  try {
+    await unlockUser(user.id)
+    await refresh()
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    actionError.value = err?.data?.statusMessage || 'Odemčení se nezdařilo.'
+  } finally {
+    unlockingId.value = null
+  }
+}
+
+function formatTime(date: Date) {
+  return date.toLocaleTimeString('cs', { hour: 'numeric', minute: '2-digit' })
 }
 
 function formatDate(iso: string) {
@@ -109,7 +136,7 @@ function formatDate(iso: string) {
       <button type="button" class="dismiss-btn" @click="issuedPassword = null">Zavřít</button>
     </div>
 
-    <p v-if="resetError" class="form-error">{{ resetError }}</p>
+    <p v-if="actionError" class="form-error">{{ actionError }}</p>
 
     <form v-if="formOpen" class="create-form" @submit.prevent="onCreate">
       <div class="field">
@@ -143,10 +170,26 @@ function formatDate(iso: string) {
             <span v-if="u.status === 'blocked'" class="badge badge-blocked">Zablokován</span>
             <span v-else-if="u.mustChangePassword" class="badge badge-pending">Čeká na změnu hesla</span>
             <span v-else class="badge badge-active">Aktivní</span>
+            <!-- Client-only: the time is formatted in the viewer's timezone,
+                 which the server-rendered HTML can't know. -->
+            <ClientOnly>
+              <span v-if="lockedUntil(u)" class="badge badge-locked">
+                Zamčeno do {{ formatTime(lockedUntil(u)!) }}
+              </span>
+            </ClientOnly>
             <span class="user-created">od {{ formatDate(u.createdAt) }}</span>
           </span>
         </div>
         <div class="user-actions">
+          <button
+            v-if="lockedUntil(u)"
+            type="button"
+            class="toggle-btn"
+            :disabled="unlockingId === u.id"
+            @click="onUnlock(u)"
+          >
+            {{ unlockingId === u.id ? 'Odemykám…' : 'Odemknout' }}
+          </button>
           <button
             type="button"
             class="toggle-btn"
@@ -402,6 +445,11 @@ function formatDate(iso: string) {
   color: var(--medium);
 }
 
+.badge-locked {
+  background: rgba(184, 80, 42, 0.14);
+  color: var(--accent);
+}
+
 .badge-blocked {
   background: rgba(161, 66, 58, 0.16);
   color: var(--hard);
@@ -413,7 +461,9 @@ function formatDate(iso: string) {
 }
 
 .user-actions {
-  flex: none;
+  /* Shrinkable (not flex: none) so up to three buttons wrap inside the
+     card on a phone instead of overflowing it. */
+  flex: 0 1 auto;
   margin-left: auto;
   display: flex;
   flex-wrap: wrap;

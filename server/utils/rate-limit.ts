@@ -8,6 +8,8 @@ export interface FailureLimiter {
   retryAfterMs(key: string): number
   recordFailure(key: string): void
   reset(key: string): void
+  // Every key currently over the limit — for the admin's lockout view.
+  blocked(): { key: string; retryAfterMs: number }[]
 }
 
 interface Window {
@@ -43,11 +45,13 @@ export function createFailureLimiter(opts: {
     }
   }
 
+  function retryAfterMs(key: string): number {
+    const w = live(key)
+    return w && w.count >= maxFailures ? w.startedAt + windowMs - now() : 0
+  }
+
   return {
-    retryAfterMs(key) {
-      const w = live(key)
-      return w && w.count >= maxFailures ? w.startedAt + windowMs - now() : 0
-    },
+    retryAfterMs,
     recordFailure(key) {
       const w = live(key)
       if (w) {
@@ -60,7 +64,58 @@ export function createFailureLimiter(opts: {
     reset(key) {
       windows.delete(key)
     },
+    blocked() {
+      const out: { key: string; retryAfterMs: number }[] = []
+      // Copied first: live() deletes expired windows while we iterate.
+      for (const key of [...windows.keys()]) {
+        const ms = retryAfterMs(key)
+        if (ms > 0) out.push({ key, retryAfterMs: ms })
+      }
+      return out
+    },
   }
+}
+
+const LOGIN_WINDOW_MS = 15 * 60 * 1000
+// Per client+username: what slows down guessing one account's password.
+// Keyed on the IP too so a stranger can't lock the real user out.
+export const loginAccountLimiter = createFailureLimiter({ maxFailures: 5, windowMs: LOGIN_WINDOW_MS })
+// Per client across all usernames: stops one IP cycling through names.
+export const loginClientLimiter = createFailureLimiter({ maxFailures: 20, windowMs: LOGIN_WINDOW_MS })
+// The change-password current-password check is a guessing oracle for
+// whoever holds the session (e.g. a stolen cookie), so it's throttled too.
+export const currentPasswordLimiter = createFailureLimiter({ maxFailures: 5, windowMs: LOGIN_WINDOW_MS })
+
+const ACCOUNT_KEY_SEPARATOR = '|'
+
+export function loginAccountKey(ip: string, username: string): string {
+  return `${ip}${ACCOUNT_KEY_SEPARATOR}${username.toLowerCase()}`
+}
+
+function lockedAccountKeys(username: string): { ip: string; key: string; retryAfterMs: number }[] {
+  const suffix = loginAccountKey('', username)
+  return loginAccountLimiter
+    .blocked()
+    .filter((b) => b.key.endsWith(suffix))
+    .map((b) => ({ ...b, ip: b.key.slice(0, -suffix.length) }))
+}
+
+// When the user can next log in from the device that's locked out longest,
+// or null if no device is. The admin user list shows this.
+export function loginLockedUntil(username: string, now = Date.now()): string | null {
+  const longest = Math.max(0, ...lockedAccountKeys(username).map((b) => b.retryAfterMs))
+  return longest > 0 ? new Date(now + longest).toISOString() : null
+}
+
+// The admin's "Odemknout": forgets this user's failed attempts from every
+// IP, those IPs' client-wide counters (one of which may be what's actually
+// blocking them), and their change-password attempts.
+export function resetLoginLimits(username: string): void {
+  for (const { ip, key } of lockedAccountKeys(username)) {
+    loginAccountLimiter.reset(key)
+    loginClientLimiter.reset(ip)
+  }
+  currentPasswordLimiter.reset(username)
 }
 
 // From the internet the app is only reached through the Caddy proxy, so the

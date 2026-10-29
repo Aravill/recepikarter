@@ -1,21 +1,14 @@
-const WINDOW_MS = 15 * 60 * 1000
-// Per client+username: what slows down guessing one account's password.
-// Keyed on the IP too so a stranger can't lock the real user out.
-const accountLimiter = createFailureLimiter({ maxFailures: 5, windowMs: WINDOW_MS })
-// Per client across all usernames: stops one IP cycling through names.
-const clientLimiter = createFailureLimiter({ maxFailures: 20, windowMs: WINDOW_MS })
-
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const username = typeof body?.username === 'string' ? body.username.trim() : ''
   const password = typeof body?.password === 'string' ? body.password : ''
 
   const ip = clientIp(event)
-  const accountKey = `${ip}|${username.toLowerCase()}`
+  const accountKey = loginAccountKey(ip, username)
 
   // Checked before verifyPassword so a blocked client doesn't get to spend
   // scrypt CPU either.
-  const retryAfterMs = Math.max(accountLimiter.retryAfterMs(accountKey), clientLimiter.retryAfterMs(ip))
+  const retryAfterMs = Math.max(loginAccountLimiter.retryAfterMs(accountKey), loginClientLimiter.retryAfterMs(ip))
   if (retryAfterMs > 0) {
     const minutes = Math.ceil(retryAfterMs / 60_000)
     setResponseHeader(event, 'Retry-After', Math.ceil(retryAfterMs / 1000))
@@ -26,8 +19,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const invalidCredentials = () => {
-    accountLimiter.recordFailure(accountKey)
-    clientLimiter.recordFailure(ip)
+    loginAccountLimiter.recordFailure(accountKey)
+    loginClientLimiter.recordFailure(ip)
     return createError({ statusCode: 401, statusMessage: 'Neplatné uživatelské jméno nebo heslo' })
   }
 
@@ -50,7 +43,7 @@ export default defineEventHandler(async (event) => {
     const valid = await verifyPassword(expectedHash, password)
     if (!valid) throw invalidCredentials()
 
-    accountLimiter.reset(accountKey)
+    loginAccountLimiter.reset(accountKey)
     await replaceUserSession(event, {
       user: { username: expectedUsername, role: 'admin', mustChangePassword: false },
       secure: { credentialVersion: adminCredentialVersion() },
@@ -69,7 +62,7 @@ export default defineEventHandler(async (event) => {
   const valid = await verifyPassword(row.password_hash, password)
   if (!valid) throw invalidCredentials()
 
-  accountLimiter.reset(accountKey)
+  loginAccountLimiter.reset(accountKey)
   await replaceUserSession(event, {
     user: { username: row.username, role: 'user', mustChangePassword: !!row.must_change_password },
     secure: { credentialVersion: String(row.session_version) },
