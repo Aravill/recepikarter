@@ -6,6 +6,7 @@ import {
   loginClientLimiter,
   loginLockouts,
   recordRefusedLogin,
+  recordSuccessfulLogin,
   resetLoginLimits,
 } from '../../../server/utils/rate-limit'
 
@@ -116,5 +117,26 @@ describe('login lockouts', () => {
     expect(loginLockouts().get('lock-b')).toBeUndefined()
     expect(loginClientLimiter.retryAfterMs('10.0.0.2')).toBe(0)
     expect(loginLockouts().get('other-user')).toBeDefined()
+  })
+
+  it('only unlocks IPs the user has logged in from, leaving an attacker locked', () => {
+    recordSuccessfulLogin('10.1.0.1', 'lock-e')
+    failLogins('10.1.0.1', 'lock-e', 5) // the user, from home
+    failLogins('10.1.0.9', 'lock-e', 5) // an attacker
+
+    resetLoginLimits('lock-e')
+
+    expect(loginAccountLimiter.retryAfterMs(loginAccountKey('10.1.0.1', 'lock-e'))).toBe(0)
+    expect(loginAccountLimiter.retryAfterMs(loginAccountKey('10.1.0.9', 'lock-e'))).toBeGreaterThan(0)
+  })
+
+  it('unlocks every IP when none of the locked ones is known', () => {
+    recordSuccessfulLogin('10.2.0.1', 'lock-f')
+    failLogins('10.2.0.7', 'lock-f', 5)
+    failLogins('10.2.0.8', 'lock-f', 5)
+
+    resetLoginLimits('lock-f')
+
+    expect(loginLockouts().get('lock-f')).toBeUndefined()
   })
 })

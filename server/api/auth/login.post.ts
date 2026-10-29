@@ -45,6 +45,7 @@ export default defineEventHandler(async (event) => {
     if (!valid) throw invalidCredentials()
 
     loginAccountLimiter.reset(accountKey)
+    recordSuccessfulLogin(ip, username)
     await replaceUserSession(event, {
       user: { username: expectedUsername, role: 'admin', mustChangePassword: false },
       secure: { credentialVersion: adminCredentialVersion() },
@@ -64,6 +65,7 @@ export default defineEventHandler(async (event) => {
   if (!valid) throw invalidCredentials()
 
   loginAccountLimiter.reset(accountKey)
+  recordSuccessfulLogin(ip, username)
   await replaceUserSession(event, {
     user: { username: row.username, role: 'user', mustChangePassword: !!row.must_change_password },
     secure: { credentialVersion: String(row.session_version) },

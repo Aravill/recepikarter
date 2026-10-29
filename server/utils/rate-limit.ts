@@ -139,15 +139,35 @@ export function loginLockouts(now = Date.now()): Map<string, string> {
   return new Map([...longest].map(([username, ms]) => [username, new Date(now + ms).toISOString()]))
 }
 
-// The admin's "Odemknout": lifts every lockout this user currently has —
-// per-account counters and the client-wide counters of the same IPs (one of
-// which may be what's actually blocking them) — plus their change-password
-// attempts. The admin can't tell the user's own IP from an attacker's, so
-// an attacker locked out on the same account gets another round too: at
-// most 5 more guesses per manual unlock.
+// IPs each user has successfully logged in from since the server started —
+// how "Odemknout" tells the user's own devices from an attacker's. Only
+// real accounts ever log in, so the map is bounded by the user count; each
+// set keeps the most recent few.
+const MAX_KNOWN_IPS_PER_USER = 10
+const knownLoginIps = new Map<string, Set<string>>()
+
+export function recordSuccessfulLogin(ip: string, username: string): void {
+  const lower = username.toLowerCase()
+  const ips = knownLoginIps.get(lower) ?? new Set<string>()
+  ips.delete(ip) // re-insert so the Set's order stays most-recent-last
+  ips.add(ip)
+  if (ips.size > MAX_KNOWN_IPS_PER_USER) ips.delete(ips.values().next().value!)
+  knownLoginIps.set(lower, ips)
+}
+
+// The admin's "Odemknout": lifts this user's lockouts — per-account counters
+// and the client-wide counters of the same IPs (one of which may be what's
+// actually blocking them) — plus their change-password attempts. Only on
+// IPs the user has logged in from before, so an attacker locked out on the
+// same account doesn't get a fresh round of guesses with every unlock. If
+// none of the locked IPs is known (a new device, or a restart cleared the
+// list), there's nothing to tell them apart by, so all are lifted.
 export function resetLoginLimits(username: string): void {
   const lower = username.toLowerCase()
-  for (const { ip } of currentLockouts().filter((l) => l.username === lower)) {
+  const locked = currentLockouts().filter((l) => l.username === lower)
+  const known = knownLoginIps.get(lower)
+  const ownLocks = locked.filter((l) => known?.has(l.ip))
+  for (const { ip } of ownLocks.length ? ownLocks : locked) {
     const key = loginAccountKey(ip, username)
     loginAccountLimiter.reset(key)
     refusedLogins.reset(key)
