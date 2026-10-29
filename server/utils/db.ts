@@ -67,9 +67,19 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'active',
     must_change_password INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    session_version INTEGER NOT NULL DEFAULT 0
   )
 `)
+
+// Stamped into each session at login and compared on every request (see
+// requireActiveSession in server/utils/auth.ts); bumping it logs the user
+// out everywhere. Same in-place upgrade as the recipes columns above.
+const userColumns = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name)
+
+if (!userColumns.includes('session_version')) {
+  db.exec('ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0')
+}
 
 interface RecipeRow {
   id: number
@@ -352,6 +362,7 @@ interface UserRow {
   must_change_password: number
   created_at: string
   updated_at: string
+  session_version: number
 }
 
 function rowToUser(row: UserRow): AppUser {
@@ -400,14 +411,16 @@ export function setUserStatus(id: number, status: UserStatus): AppUser | undefin
   return row ? rowToUser(row) : undefined
 }
 
-export function setUserPassword(id: number, passwordHash: string, mustChangePassword: boolean): void {
+// Also bumps session_version, so every other session of this user (another
+// device, a stolen cookie) stops working. Returns the new version for the
+// caller to stamp into the session it re-issues.
+export function setUserPassword(id: number, passwordHash: string, mustChangePassword: boolean): number {
   const now = new Date().toISOString()
-  db.prepare('UPDATE users SET password_hash = ?, must_change_password = ?, updated_at = ? WHERE id = ?').run(
-    passwordHash,
-    mustChangePassword ? 1 : 0,
-    now,
-    id,
-  )
+  db.prepare(
+    `UPDATE users SET password_hash = ?, must_change_password = ?, session_version = session_version + 1,
+       updated_at = ? WHERE id = ?`,
+  ).run(passwordHash, mustChangePassword ? 1 : 0, now, id)
+  return findUserRowById(id)!.session_version
 }
 
 // Three brand-new tables, like shopping_lists above — every already-deployed

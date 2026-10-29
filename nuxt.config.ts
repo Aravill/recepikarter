@@ -5,11 +5,15 @@ export default defineNuxtConfig({
   modules: ['nuxt-auth-utils', '@nuxt/eslint'],
   runtimeConfig: {
     session: {
-      // h3 defaults the session cookie to Secure, which browsers silently
-      // drop on a plain-HTTP origin. This deploys with no reverse proxy/TLS
-      // in front (see CLAUDE.md), so Secure would make login look like it
-      // works (200 OK) while never actually setting the cookie.
-      cookie: { secure: false },
+      // HTTPS is terminated by the Caddy proxy in front, so the browser
+      // sees an https origin even though the app itself speaks plain HTTP.
+      // Browsers silently drop a Secure cookie on a plain-HTTP origin other
+      // than localhost — set NUXT_SESSION_COOKIE_SECURE=false to log in
+      // over http://<lan-ip>:3000 directly.
+      cookie: { secure: true },
+      // Absolute lifetime (h3 counts from login, not last use): a stolen
+      // cookie stops working after 30 days at the latest.
+      maxAge: 60 * 60 * 24 * 30,
     },
   },
   app: {

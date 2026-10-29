@@ -207,6 +207,15 @@ describe('users db', () => {
     expect(row?.password_hash).toBe('new-hash')
     expect(row?.must_change_password).toBe(0)
   })
+
+  it('bumps the session version on every password change', () => {
+    const user = createUser('novak-4', 'hashed')
+    expect(findUserRowByUsername('novak-4')?.session_version).toBe(0)
+
+    expect(setUserPassword(user.id, 'hash-2', false)).toBe(1)
+    expect(setUserPassword(user.id, 'hash-3', false)).toBe(2)
+    expect(findUserRowByUsername('novak-4')?.session_version).toBe(2)
+  })
 })
 
 describe('shopping lists db', () => {

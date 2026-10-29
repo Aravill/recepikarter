@@ -16,9 +16,9 @@
     "better-sqlite3": "^13.0.3",
     "fuse.js": "^7.5.0",
     "html-to-image": "^1.11.13",
-    "nuxt": "^4.5.2",
-    "nuxt-auth-utils": "^0.5.30",
-    "sharp": "^0.35.4",
+    "nuxt": "^4.6.2",
+    "nuxt-auth-utils": "^0.5.32",
+    "sharp": "^0.35.5",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"
   },

@@ -1,9 +1,12 @@
+import { generateTempPassword } from '#shared/utils/password-policy'
+
 // Creates a user with a temporary password the admin sets (or, if omitted,
 // one generated here) — returned once in the response so the admin can
 // relay it, since this app has no email/SMS delivery. The account is
 // created with mustChangePassword already set (see createUser in
 // server/utils/db.ts), so that password only works to log in once.
 export default defineEventHandler(async (event) => {
+  await requireAdminSession(event)
   const body = await readBody(event)
   const username = parseUsername(body?.username)
 
@@ -15,10 +18,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const providedPassword = typeof body?.tempPassword === 'string' ? body.tempPassword.trim() : ''
-  if (providedPassword && providedPassword.length < 8) {
-    throw createError({ statusCode: 400, statusMessage: 'Dočasné heslo musí mít alespoň 8 znaků' })
-  }
-  const tempPassword = providedPassword || generateTempPassword()
+  if (providedPassword) assertPasswordPolicy(providedPassword, username)
+  const tempPassword = providedPassword || generateTempPassword(username)
 
   const passwordHash = await hashPassword(tempPassword)
   const user = createUser(username, passwordHash)
