@@ -73,9 +73,7 @@ docker compose up -d --build
 ```
 
 The app is then at `http://localhost:3000` (override the host port with
-`PORT` in `.env`). It's published on `127.0.0.1` only, for a reverse proxy
-on the same host to terminate HTTPS in front of it; set `BIND_ADDRESS` in
-`.env` if the proxy runs elsewhere. The SQLite database lives in a named volume
+`PORT` in `.env`). The SQLite database lives in a named volume
 (`db-data:/app/data`) so it survives rebuilds and restarts.
 
 `AUTH_PASSWORD_HASH` is deliberately base64-encoded in `.env` — the raw

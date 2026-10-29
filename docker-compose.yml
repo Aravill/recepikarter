@@ -4,12 +4,7 @@ services:
     container_name: recepikarter
     restart: unless-stopped
     ports:
-      # Loopback-only by default: the app speaks plain HTTP and is meant to
-      # be reached through a TLS-terminating reverse proxy (Caddy) on the
-      # same host. Docker-published ports bypass ufw/firewalld, so binding
-      # to 0.0.0.0 would expose the unencrypted port to the whole network.
-      # Set BIND_ADDRESS if the proxy runs on another machine.
-      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
+      - "${PORT:-3000}:3000"
     env_file:
       - .env
     volumes:
