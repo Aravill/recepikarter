@@ -52,11 +52,16 @@ async function onCreate() {
 }
 
 async function onToggleStatus(user: AppUser) {
+  actionError.value = ''
   togglingId.value = user.id
   try {
     if (user.status === 'blocked') await unblockUser(user.id)
     else await blockUser(user.id)
     await refresh()
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    actionError.value =
+      err?.data?.statusMessage || (user.status === 'blocked' ? 'Odblokování se nezdařilo.' : 'Zablokování se nezdařilo.')
   } finally {
     togglingId.value = null
   }
@@ -84,11 +89,20 @@ async function onResetPassword(user: AppUser) {
 }
 
 // The lockout is a server-side snapshot from when the list loaded; past
-// that time it has lapsed on its own, so stop showing it.
+// that time it has lapsed on its own, so stop showing it. `now` ticks so
+// that happens without a reload — and only on the client, which is why the
+// badge and button that depend on it are inside <ClientOnly>.
+const now = ref(Date.now())
+let nowTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  nowTimer = setInterval(() => (now.value = Date.now()), 15_000)
+})
+onBeforeUnmount(() => clearInterval(nowTimer))
+
 function lockedUntil(user: AdminUser): Date | null {
   if (!user.loginLockedUntil) return null
   const until = new Date(user.loginLockedUntil)
-  return until.getTime() > Date.now() ? until : null
+  return until.getTime() > now.value ? until : null
 }
 
 async function onUnlock(user: AdminUser) {
@@ -97,6 +111,7 @@ async function onUnlock(user: AdminUser) {
   try {
     await unlockUser(user.id)
     await refresh()
+    now.value = Date.now()
   } catch (e) {
     const err = e as { data?: { statusMessage?: string } }
     actionError.value = err?.data?.statusMessage || 'Odemčení se nezdařilo.'
@@ -171,7 +186,8 @@ function formatDate(iso: string) {
             <span v-else-if="u.mustChangePassword" class="badge badge-pending">Čeká na změnu hesla</span>
             <span v-else class="badge badge-active">Aktivní</span>
             <!-- Client-only: the time is formatted in the viewer's timezone,
-                 which the server-rendered HTML can't know. -->
+                 which the server-rendered HTML can't know, and whether it's
+                 still shown depends on the client's ticking clock. -->
             <ClientOnly>
               <span v-if="lockedUntil(u)" class="badge badge-locked">
                 Zamčeno do {{ formatTime(lockedUntil(u)!) }}
@@ -181,15 +197,17 @@ function formatDate(iso: string) {
           </span>
         </div>
         <div class="user-actions">
-          <button
-            v-if="lockedUntil(u)"
-            type="button"
-            class="toggle-btn"
-            :disabled="unlockingId === u.id"
-            @click="onUnlock(u)"
-          >
-            {{ unlockingId === u.id ? 'Odemykám…' : 'Odemknout' }}
-          </button>
+          <ClientOnly>
+            <button
+              v-if="lockedUntil(u)"
+              type="button"
+              class="toggle-btn"
+              :disabled="unlockingId === u.id"
+              @click="onUnlock(u)"
+            >
+              {{ unlockingId === u.id ? 'Odemykám…' : 'Odemknout' }}
+            </button>
+          </ClientOnly>
           <button
             type="button"
             class="toggle-btn"
