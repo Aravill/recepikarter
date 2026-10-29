@@ -14,6 +14,11 @@ export function useAdminUsers() {
     })
   const blockUser = (id: number) => $fetch<AppUser>(`/api/admin/users/${id}/block`, { method: 'POST', headers })
   const unblockUser = (id: number) => $fetch<AppUser>(`/api/admin/users/${id}/unblock`, { method: 'POST', headers })
+  const resetPassword = (id: number) =>
+    $fetch<{ user: AppUser; tempPassword: string }>(`/api/admin/users/${id}/reset-password`, {
+      method: 'POST',
+      headers,
+    })
 
-  return { listUsers, createUser, blockUser, unblockUser }
+  return { listUsers, createUser, blockUser, unblockUser, resetPassword }
 }

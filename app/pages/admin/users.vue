@@ -2,7 +2,7 @@
 import type { AppUser } from '#shared/types/user'
 import { PASSWORD_MIN_LENGTH, generateTempPassword } from '#shared/utils/password-policy'
 
-const { listUsers, createUser, blockUser, unblockUser } = useAdminUsers()
+const { listUsers, createUser, blockUser, unblockUser, resetPassword } = useAdminUsers()
 const { data: users, refresh } = await useAsyncData('admin-users', () => listUsers())
 
 const formOpen = ref(false)
@@ -10,8 +10,12 @@ const newUsername = ref('')
 const newTempPassword = ref('')
 const creating = ref(false)
 const createError = ref('')
-const justCreated = ref<{ username: string; tempPassword: string } | null>(null)
+// Banner showing a temporary password once — for a new account or after a
+// reset. It's never retrievable again, so it stays until dismissed.
+const issuedPassword = ref<{ username: string; tempPassword: string; reset: boolean } | null>(null)
 const togglingId = ref<number | null>(null)
+const resettingId = ref<number | null>(null)
+const resetError = ref('')
 
 function generatePassword() {
   newTempPassword.value = generateTempPassword(newUsername.value.trim())
@@ -19,7 +23,7 @@ function generatePassword() {
 
 function openForm() {
   formOpen.value = true
-  justCreated.value = null
+  issuedPassword.value = null
   createError.value = ''
 }
 
@@ -35,7 +39,7 @@ async function onCreate() {
   creating.value = true
   try {
     const { user, tempPassword } = await createUser(newUsername.value.trim(), newTempPassword.value.trim())
-    justCreated.value = { username: user.username, tempPassword }
+    issuedPassword.value = { username: user.username, tempPassword, reset: false }
     closeForm()
     await refresh()
   } catch (e) {
@@ -57,6 +61,27 @@ async function onToggleStatus(user: AppUser) {
   }
 }
 
+async function onResetPassword(user: AppUser) {
+  if (
+    !confirm(
+      `Resetovat heslo uživatele „${user.username}“? Bude odhlášen ze všech zařízení a při příštím přihlášení si nastaví nové.`,
+    )
+  )
+    return
+  resetError.value = ''
+  resettingId.value = user.id
+  try {
+    const { tempPassword } = await resetPassword(user.id)
+    issuedPassword.value = { username: user.username, tempPassword, reset: true }
+    await refresh()
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    resetError.value = err?.data?.statusMessage || 'Reset hesla se nezdařil.'
+  } finally {
+    resettingId.value = null
+  }
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('cs', { day: 'numeric', month: 'numeric', year: 'numeric' })
 }
@@ -69,14 +94,22 @@ function formatDate(iso: string) {
       <button v-if="!formOpen" type="button" class="btn-primary" @click="openForm">+ Přidat uživatele</button>
     </div>
 
-    <div v-if="justCreated" class="created-banner">
+    <div v-if="issuedPassword" class="created-banner">
       <p>
-        Uživatel <strong>{{ justCreated.username }}</strong> vytvořen. Dočasné heslo:
-        <code>{{ justCreated.tempPassword }}</code>
+        <template v-if="issuedPassword.reset">
+          Heslo uživatele <strong>{{ issuedPassword.username }}</strong> resetováno.
+        </template>
+        <template v-else>Uživatel <strong>{{ issuedPassword.username }}</strong> vytvořen.</template>
+        Dočasné heslo:
+        <code>{{ issuedPassword.tempPassword }}</code>
       </p>
-      <p class="created-hint">Sdělte ho uživateli — při prvním přihlášení si ho bude muset změnit.</p>
-      <button type="button" class="dismiss-btn" @click="justCreated = null">Zavřít</button>
+      <p class="created-hint">
+        Sdělte ho uživateli — při příštím přihlášení si ho bude muset změnit. Znovu se už nezobrazí.
+      </p>
+      <button type="button" class="dismiss-btn" @click="issuedPassword = null">Zavřít</button>
     </div>
+
+    <p v-if="resetError" class="form-error">{{ resetError }}</p>
 
     <form v-if="formOpen" class="create-form" @submit.prevent="onCreate">
       <div class="field">
@@ -108,19 +141,29 @@ function formatDate(iso: string) {
           <span class="user-name">{{ u.username }}</span>
           <span class="user-meta">
             <span v-if="u.status === 'blocked'" class="badge badge-blocked">Zablokován</span>
-            <span v-else-if="u.mustChangePassword" class="badge badge-pending">Čeká na první přihlášení</span>
+            <span v-else-if="u.mustChangePassword" class="badge badge-pending">Čeká na změnu hesla</span>
             <span v-else class="badge badge-active">Aktivní</span>
             <span class="user-created">od {{ formatDate(u.createdAt) }}</span>
           </span>
         </div>
-        <button
-          type="button"
-          class="toggle-btn"
-          :disabled="togglingId === u.id"
-          @click="onToggleStatus(u)"
-        >
-          {{ u.status === 'blocked' ? 'Odblokovat' : 'Zablokovat' }}
-        </button>
+        <div class="user-actions">
+          <button
+            type="button"
+            class="toggle-btn"
+            :disabled="resettingId === u.id"
+            @click="onResetPassword(u)"
+          >
+            {{ resettingId === u.id ? 'Resetuji…' : 'Resetovat heslo' }}
+          </button>
+          <button
+            type="button"
+            class="toggle-btn"
+            :disabled="togglingId === u.id"
+            @click="onToggleStatus(u)"
+          >
+            {{ u.status === 'blocked' ? 'Odblokovat' : 'Zablokovat' }}
+          </button>
+        </div>
       </div>
       <p v-if="users && !users.length" class="empty">Zatím žádní uživatelé kromě správce.</p>
     </div>
@@ -306,6 +349,7 @@ function formatDate(iso: string) {
   padding: 13px 16px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   border-left: 4px solid var(--easy);
@@ -316,6 +360,9 @@ function formatDate(iso: string) {
 }
 
 .user-main {
+  /* The basis is what makes the two action buttons drop to their own line
+     on a phone instead of squeezing the name and badge. */
+  flex: 1 1 180px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -342,6 +389,7 @@ function formatDate(iso: string) {
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 .badge-active {
@@ -362,6 +410,15 @@ function formatDate(iso: string) {
 .user-created {
   font-size: 11.5px;
   color: var(--surface-ink-dim);
+}
+
+.user-actions {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .toggle-btn {
