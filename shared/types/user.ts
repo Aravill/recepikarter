@@ -18,3 +18,13 @@ export interface AdminUser extends AppUser {
   // if they aren't locked out by failed login attempts.
   loginLockedUntil: string | null
 }
+
+// Why the server rejected a session that used to be valid — sent as the 401's
+// `data.sessionEnded` (see requireActiveSession in server/utils/auth.ts) so
+// the client can tell the user on the login page.
+export type SessionEndReason = 'blocked' | 'credentials-changed'
+
+export const SESSION_END_MESSAGES: Record<SessionEndReason, string> = {
+  blocked: 'Váš účet byl zablokován správcem.',
+  'credentials-changed': 'Heslo k účtu bylo změněno. Přihlaste se znovu.',
+}

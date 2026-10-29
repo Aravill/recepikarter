@@ -25,7 +25,9 @@ export default defineEventHandler(async (event) => {
   const valid = await verifyPassword(row.password_hash, currentPassword)
   if (!valid) {
     currentPasswordLimiter.recordFailure(row.username)
-    throw createError({ statusCode: 401, statusMessage: 'Současné heslo není správné' })
+    // 400, not 401: the client treats any 401 as "session gone" and logs
+    // the tab out (see app/plugins/session-guard.client.ts).
+    throw createError({ statusCode: 400, statusMessage: 'Současné heslo není správné' })
   }
   currentPasswordLimiter.reset(row.username)
   if (newPassword === currentPassword) {

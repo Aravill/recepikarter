@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { fetch: refreshSession } = useUserSession()
+const sessionEndedNotice = useSessionEndedNotice()
 
 const username = ref('')
 const password = ref('')
@@ -10,10 +11,11 @@ async function onSubmit() {
   error.value = ''
   submitting.value = true
   try {
-    await $fetch('/api/auth/login', {
+    await apiFetch('/api/auth/login', {
       method: 'POST',
       body: { username: username.value, password: password.value },
     })
+    sessionEndedNotice.value = ''
     await refreshSession()
     await navigateTo('/')
   } catch (e) {
@@ -29,6 +31,7 @@ async function onSubmit() {
   <div class="login-body">
     <img src="/banner.png" alt="Recepikarter — Kartotéka receptů" class="banner" />
     <form class="login-panel" @submit.prevent="onSubmit">
+      <p v-if="sessionEndedNotice" class="login-notice" role="status">{{ sessionEndedNotice }}</p>
       <div class="field">
         <label for="u">Uživatelské jméno</label>
         <input id="u" v-model="username" type="text" autocomplete="username" required />
@@ -103,6 +106,16 @@ async function onSubmit() {
 .field input:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.login-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(201, 138, 46, 0.14);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--surface-ink);
 }
 
 .login-error {

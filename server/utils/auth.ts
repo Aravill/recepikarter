@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto'
 import type { H3Event } from 'h3'
 import type { UserSession } from '#auth-utils'
+import { SESSION_END_MESSAGES } from '#shared/types/user'
+import type { SessionEndReason } from '#shared/types/user'
 import { passwordPolicyMessage, passwordPolicyViolations } from '#shared/utils/password-policy'
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{2,32}$/
@@ -45,25 +47,29 @@ export async function requireActiveSession(event: H3Event): Promise<ActiveSessio
   const { user } = session
   const version = session.secure?.credentialVersion
 
-  let reason: string | undefined
+  let reason: SessionEndReason | undefined
   if (user.role === 'admin') {
     if (user.username !== process.env.AUTH_USERNAME || version !== adminCredentialVersion()) {
-      reason = 'Přihlášení vypršelo, přihlaste se znovu'
+      reason = 'credentials-changed'
     }
   } else {
     // Re-checked on every request (not just at login) so blocking a user
     // takes effect immediately, not just on their next login.
     const row = findUserRowByUsername(user.username)
     if (!row || row.status === 'blocked') {
-      reason = 'Účet byl zablokován'
+      reason = 'blocked'
     } else if (version !== String(row.session_version)) {
-      reason = 'Přihlášení vypršelo, přihlaste se znovu'
+      reason = 'credentials-changed'
     }
   }
 
   if (reason) {
     await clearUserSession(event)
-    throw createError({ statusCode: 401, statusMessage: reason })
+    throw createError({
+      statusCode: 401,
+      statusMessage: SESSION_END_MESSAGES[reason],
+      data: { sessionEnded: reason },
+    })
   }
   return session
 }
