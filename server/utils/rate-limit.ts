@@ -86,33 +86,71 @@ export const loginClientLimiter = createFailureLimiter({ maxFailures: 20, window
 // whoever holds the session (e.g. a stolen cookie), so it's throttled too.
 export const currentPasswordLimiter = createFailureLimiter({ maxFailures: 5, windowMs: LOGIN_WINDOW_MS })
 
+// Attempts the limiters turned away, per client+username. The client-wide
+// limit never sees the username, so without this a user locked out by it
+// (e.g. a shared home IP that racked up failures across names) would be
+// invisible to the admin. Any live entry counts, hence maxFailures: 1.
+const refusedLogins = createFailureLimiter({ maxFailures: 1, windowMs: LOGIN_WINDOW_MS })
+
 const ACCOUNT_KEY_SEPARATOR = '|'
 
+// The username is encoded so one containing the separator (login accepts
+// any string) can't pose as a different IP + username pair. IPs never
+// contain it.
 export function loginAccountKey(ip: string, username: string): string {
-  return `${ip}${ACCOUNT_KEY_SEPARATOR}${username.toLowerCase()}`
+  return `${ip}${ACCOUNT_KEY_SEPARATOR}${encodeURIComponent(username.toLowerCase())}`
 }
 
-function lockedAccountKeys(username: string): { ip: string; key: string; retryAfterMs: number }[] {
-  const suffix = loginAccountKey('', username)
-  return loginAccountLimiter
-    .blocked()
-    .filter((b) => b.key.endsWith(suffix))
-    .map((b) => ({ ...b, ip: b.key.slice(0, -suffix.length) }))
+function parseAccountKey(key: string): { ip: string; username: string } {
+  const at = key.indexOf(ACCOUNT_KEY_SEPARATOR)
+  return { ip: key.slice(0, at), username: decodeURIComponent(key.slice(at + 1)) }
 }
 
-// When the user can next log in from the device that's locked out longest,
-// or null if no device is. The admin user list shows this.
-export function loginLockedUntil(username: string, now = Date.now()): string | null {
-  const longest = Math.max(0, ...lockedAccountKeys(username).map((b) => b.retryAfterMs))
-  return longest > 0 ? new Date(now + longest).toISOString() : null
+export function recordRefusedLogin(ip: string, username: string): void {
+  refusedLogins.recordFailure(loginAccountKey(ip, username))
 }
 
-// The admin's "Odemknout": forgets this user's failed attempts from every
-// IP, those IPs' client-wide counters (one of which may be what's actually
-// blocking them), and their change-password attempts.
+interface Lockout {
+  ip: string
+  username: string
+  retryAfterMs: number
+}
+
+// Every client+username currently unable to log in, by either limit.
+function currentLockouts(): Lockout[] {
+  const keys = new Set([...loginAccountLimiter.blocked(), ...refusedLogins.blocked()].map((b) => b.key))
+  const out: Lockout[] = []
+  for (const key of keys) {
+    const { ip, username } = parseAccountKey(key)
+    const retryAfterMs = Math.max(loginAccountLimiter.retryAfterMs(key), loginClientLimiter.retryAfterMs(ip))
+    if (retryAfterMs > 0) out.push({ ip, username, retryAfterMs })
+  }
+  return out
+}
+
+// Lowercased username -> ISO time the user can next log in from the device
+// that's locked out longest. Built once per call so the admin user list
+// doesn't rescan the limiters for every row.
+export function loginLockouts(now = Date.now()): Map<string, string> {
+  const longest = new Map<string, number>()
+  for (const { username, retryAfterMs } of currentLockouts()) {
+    longest.set(username, Math.max(longest.get(username) ?? 0, retryAfterMs))
+  }
+  return new Map([...longest].map(([username, ms]) => [username, new Date(now + ms).toISOString()]))
+}
+
+// The admin's "Odemknout": lifts every lockout this user currently has —
+// per-account counters and the client-wide counters of the same IPs (one of
+// which may be what's actually blocking them) — plus their change-password
+// attempts. The admin can't tell the user's own IP from an attacker's, so
+// an attacker locked out on the same account gets another round too: at
+// most 5 more guesses per manual unlock.
 export function resetLoginLimits(username: string): void {
-  for (const { ip, key } of lockedAccountKeys(username)) {
+  const lower = username.toLowerCase()
+  for (const { ip } of currentLockouts().filter((l) => l.username === lower)) {
+    const key = loginAccountKey(ip, username)
     loginAccountLimiter.reset(key)
+    refusedLogins.reset(key)
     loginClientLimiter.reset(ip)
   }
   currentPasswordLimiter.reset(username)

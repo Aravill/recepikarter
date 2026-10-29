@@ -4,7 +4,8 @@ import {
   loginAccountKey,
   loginAccountLimiter,
   loginClientLimiter,
-  loginLockedUntil,
+  loginLockouts,
+  recordRefusedLogin,
   resetLoginLimits,
 } from '../../../server/utils/rate-limit'
 
@@ -69,30 +70,51 @@ describe('createFailureLimiter blocked()', () => {
 })
 
 describe('login lockouts', () => {
-  function lockOut(ip: string, username: string) {
-    for (let i = 0; i < 5; i++) {
+  function failLogins(ip: string, username: string, times: number) {
+    for (let i = 0; i < times; i++) {
       loginAccountLimiter.recordFailure(loginAccountKey(ip, username))
       loginClientLimiter.recordFailure(ip)
     }
   }
 
   it('reports a locked-out user, matching the username case-insensitively', () => {
-    lockOut('10.0.0.1', 'Lock-A')
-    expect(loginLockedUntil('lock-a')).not.toBeNull()
+    failLogins('10.0.0.1', 'Lock-A', 5)
+    const lockouts = loginLockouts()
+    expect(lockouts.get('lock-a')).toBeDefined()
     // A username that's a suffix of the locked one isn't affected.
-    expect(loginLockedUntil('ck-a')).toBeNull()
+    expect(lockouts.get('ck-a')).toBeUndefined()
+  })
+
+  it('reports a user refused only because their IP hit the client-wide limit', () => {
+    failLogins('10.0.0.5', 'someone-else', 4)
+    for (let i = 0; i < 16; i++) loginClientLimiter.recordFailure('10.0.0.5')
+    expect(loginLockouts().get('lock-c')).toBeUndefined()
+
+    recordRefusedLogin('10.0.0.5', 'lock-c')
+    expect(loginLockouts().get('lock-c')).toBeDefined()
+
+    resetLoginLimits('lock-c')
+    expect(loginLockouts().get('lock-c')).toBeUndefined()
+    expect(loginClientLimiter.retryAfterMs('10.0.0.5')).toBe(0)
+  })
+
+  it("doesn't let a username containing the separator pose as another user", () => {
+    failLogins('10.0.0.6', 'x|lock-d', 5)
+    const lockouts = loginLockouts()
+    expect(lockouts.get('lock-d')).toBeUndefined()
+    expect(lockouts.get('x|lock-d')).toBeDefined()
   })
 
   it('resetLoginLimits clears the user from every IP, and those IPs’ counters', () => {
-    lockOut('10.0.0.2', 'lock-b')
-    lockOut('10.0.0.3', 'lock-b')
+    failLogins('10.0.0.2', 'lock-b', 5)
+    failLogins('10.0.0.3', 'lock-b', 5)
     for (let i = 0; i < 15; i++) loginClientLimiter.recordFailure('10.0.0.2')
-    lockOut('10.0.0.4', 'other-user')
+    failLogins('10.0.0.4', 'other-user', 5)
 
     resetLoginLimits('lock-b')
 
-    expect(loginLockedUntil('lock-b')).toBeNull()
+    expect(loginLockouts().get('lock-b')).toBeUndefined()
     expect(loginClientLimiter.retryAfterMs('10.0.0.2')).toBe(0)
-    expect(loginLockedUntil('other-user')).not.toBeNull()
+    expect(loginLockouts().get('other-user')).toBeDefined()
   })
 })

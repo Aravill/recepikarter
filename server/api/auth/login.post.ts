@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
   // scrypt CPU either.
   const retryAfterMs = Math.max(loginAccountLimiter.retryAfterMs(accountKey), loginClientLimiter.retryAfterMs(ip))
   if (retryAfterMs > 0) {
+    if (username) recordRefusedLogin(ip, username)
     const minutes = Math.ceil(retryAfterMs / 60_000)
     setResponseHeader(event, 'Retry-After', Math.ceil(retryAfterMs / 1000))
     throw createError({
