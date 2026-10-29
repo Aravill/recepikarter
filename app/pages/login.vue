@@ -1,6 +1,15 @@
 <script setup lang="ts">
+import { SESSION_END_MESSAGES, SESSION_ENDED_COOKIE } from '#shared/types/user'
+import type { SessionEndReason } from '#shared/types/user'
+
 const { fetch: refreshSession } = useUserSession()
-const sessionEndedNotice = useSessionEndedNotice()
+
+// Set by the server when it logged this browser out (blocked, password
+// changed, expired) — see endSession in server/utils/auth.ts.
+const sessionEndedReason = useCookie<SessionEndReason | null>(SESSION_ENDED_COOKIE)
+const sessionEndedNotice = computed(() =>
+  sessionEndedReason.value ? (SESSION_END_MESSAGES[sessionEndedReason.value] ?? '') : '',
+)
 
 const username = ref('')
 const password = ref('')
@@ -9,13 +18,15 @@ const submitting = ref(false)
 
 async function onSubmit() {
   error.value = ''
+  // The "why you were logged out" notice has done its job once they try
+  // again; leaving it next to a fresh error would be confusing.
+  sessionEndedReason.value = null
   submitting.value = true
   try {
     await apiFetch('/api/auth/login', {
       method: 'POST',
       body: { username: username.value, password: password.value },
     })
-    sessionEndedNotice.value = ''
     await refreshSession()
     await navigateTo('/')
   } catch (e) {

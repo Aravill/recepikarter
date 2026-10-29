@@ -1,19 +1,13 @@
-import { SESSION_END_MESSAGES } from '#shared/types/user'
-import type { SessionEndReason } from '#shared/types/user'
-
-// The server rejects a session that's no longer valid with a 401, but an
-// already-open tab never noticed: it stayed in the app with every request
-// failing and empty pages. apiFetch (app/utils/apiFetch.ts) announces those
-// 401s; this logs the tab out and tells the user why on the login page.
+// The server rejects a session that's no longer valid, but an already-open
+// tab never noticed: it stayed in the app with every request failing and
+// empty pages. This logs the tab out instead; the login page then shows why
+// (from the cookie the server set, see endSession in server/utils/auth.ts).
 export default defineNuxtPlugin(() => {
-  const { session, loggedIn } = useUserSession()
-  const notice = useSessionEndedNotice()
+  const { session, loggedIn, fetch: refreshSession } = useUserSession()
   const router = useRouter()
 
-  window.addEventListener(SESSION_ENDED_EVENT, (e) => {
-    if (!loggedIn.value) return
-    const reason = (e as CustomEvent<SessionEndReason | undefined>).detail
-    notice.value = (reason && SESSION_END_MESSAGES[reason]) || 'Byli jste odhlášeni. Přihlaste se znovu.'
+  // apiFetch (app/utils/apiFetch.ts) announces a rejected session.
+  window.addEventListener(SESSION_ENDED_EVENT, () => {
     session.value = null
   })
 
@@ -22,11 +16,10 @@ export default defineNuxtPlugin(() => {
   })
 
   // A tab left open in the background makes no requests, so re-check the
-  // session when it's looked at again rather than on the next click. A 401
-  // here goes through the listener above; success needs nothing.
+  // session when it's looked at again rather than on the next click. A
+  // rejected or already-cleared session comes back empty, which logs the
+  // tab out through the watcher above.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && loggedIn.value) {
-      apiFetch('/api/_auth/session').catch(() => {})
-    }
+    if (document.visibilityState === 'visible' && loggedIn.value) refreshSession()
   })
 })
