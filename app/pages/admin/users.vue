@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { AppUser } from '#shared/types/user'
+import type { AdminUser, AppUser } from '#shared/types/user'
 import { PASSWORD_MIN_LENGTH, generateTempPassword } from '#shared/utils/password-policy'
 
-const { listUsers, createUser, blockUser, unblockUser } = useAdminUsers()
+const { listUsers, createUser, blockUser, unblockUser, resetPassword, unlockUser } = useAdminUsers()
 const { data: users, refresh } = await useAsyncData('admin-users', () => listUsers())
 
 const formOpen = ref(false)
@@ -10,8 +10,13 @@ const newUsername = ref('')
 const newTempPassword = ref('')
 const creating = ref(false)
 const createError = ref('')
-const justCreated = ref<{ username: string; tempPassword: string } | null>(null)
+// Banner showing a temporary password once — for a new account or after a
+// reset. It's never retrievable again, so it stays until dismissed.
+const issuedPassword = ref<{ username: string; tempPassword: string; reset: boolean } | null>(null)
 const togglingId = ref<number | null>(null)
+const resettingId = ref<number | null>(null)
+const unlockingId = ref<number | null>(null)
+const actionError = ref('')
 
 function generatePassword() {
   newTempPassword.value = generateTempPassword(newUsername.value.trim())
@@ -19,7 +24,7 @@ function generatePassword() {
 
 function openForm() {
   formOpen.value = true
-  justCreated.value = null
+  issuedPassword.value = null
   createError.value = ''
 }
 
@@ -35,7 +40,7 @@ async function onCreate() {
   creating.value = true
   try {
     const { user, tempPassword } = await createUser(newUsername.value.trim(), newTempPassword.value.trim())
-    justCreated.value = { username: user.username, tempPassword }
+    issuedPassword.value = { username: user.username, tempPassword, reset: false }
     closeForm()
     await refresh()
   } catch (e) {
@@ -47,14 +52,76 @@ async function onCreate() {
 }
 
 async function onToggleStatus(user: AppUser) {
+  actionError.value = ''
   togglingId.value = user.id
   try {
     if (user.status === 'blocked') await unblockUser(user.id)
     else await blockUser(user.id)
     await refresh()
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    actionError.value =
+      err?.data?.statusMessage || (user.status === 'blocked' ? 'Odblokování se nezdařilo.' : 'Zablokování se nezdařilo.')
   } finally {
     togglingId.value = null
   }
+}
+
+async function onResetPassword(user: AppUser) {
+  if (
+    !confirm(
+      `Resetovat heslo uživatele „${user.username}“? Bude odhlášen ze všech zařízení a při příštím přihlášení si nastaví nové.`,
+    )
+  )
+    return
+  actionError.value = ''
+  resettingId.value = user.id
+  try {
+    const { tempPassword } = await resetPassword(user.id)
+    issuedPassword.value = { username: user.username, tempPassword, reset: true }
+    await refresh()
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    actionError.value = err?.data?.statusMessage || 'Reset hesla se nezdařil.'
+  } finally {
+    resettingId.value = null
+  }
+}
+
+// The lockout is a server-side snapshot from when the list loaded; past
+// that time it has lapsed on its own, so stop showing it. `now` ticks so
+// that happens without a reload — and only on the client, which is why the
+// badge and button that depend on it are inside <ClientOnly>.
+const now = ref(Date.now())
+let nowTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  nowTimer = setInterval(() => (now.value = Date.now()), 15_000)
+})
+onBeforeUnmount(() => clearInterval(nowTimer))
+
+function lockedUntil(user: AdminUser): Date | null {
+  if (!user.loginLockedUntil) return null
+  const until = new Date(user.loginLockedUntil)
+  return until.getTime() > now.value ? until : null
+}
+
+async function onUnlock(user: AdminUser) {
+  actionError.value = ''
+  unlockingId.value = user.id
+  try {
+    await unlockUser(user.id)
+    await refresh()
+    now.value = Date.now()
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    actionError.value = err?.data?.statusMessage || 'Odemčení se nezdařilo.'
+  } finally {
+    unlockingId.value = null
+  }
+}
+
+function formatTime(date: Date) {
+  return date.toLocaleTimeString('cs', { hour: 'numeric', minute: '2-digit' })
 }
 
 function formatDate(iso: string) {
@@ -69,14 +136,22 @@ function formatDate(iso: string) {
       <button v-if="!formOpen" type="button" class="btn-primary" @click="openForm">+ Přidat uživatele</button>
     </div>
 
-    <div v-if="justCreated" class="created-banner">
+    <div v-if="issuedPassword" class="created-banner">
       <p>
-        Uživatel <strong>{{ justCreated.username }}</strong> vytvořen. Dočasné heslo:
-        <code>{{ justCreated.tempPassword }}</code>
+        <template v-if="issuedPassword.reset">
+          Heslo uživatele <strong>{{ issuedPassword.username }}</strong> resetováno.
+        </template>
+        <template v-else>Uživatel <strong>{{ issuedPassword.username }}</strong> vytvořen.</template>
+        Dočasné heslo:
+        <code>{{ issuedPassword.tempPassword }}</code>
       </p>
-      <p class="created-hint">Sdělte ho uživateli — při prvním přihlášení si ho bude muset změnit.</p>
-      <button type="button" class="dismiss-btn" @click="justCreated = null">Zavřít</button>
+      <p class="created-hint">
+        Sdělte ho uživateli — při příštím přihlášení si ho bude muset změnit. Znovu se už nezobrazí.
+      </p>
+      <button type="button" class="dismiss-btn" @click="issuedPassword = null">Zavřít</button>
     </div>
+
+    <p v-if="actionError" class="form-error">{{ actionError }}</p>
 
     <form v-if="formOpen" class="create-form" @submit.prevent="onCreate">
       <div class="field">
@@ -108,19 +183,48 @@ function formatDate(iso: string) {
           <span class="user-name">{{ u.username }}</span>
           <span class="user-meta">
             <span v-if="u.status === 'blocked'" class="badge badge-blocked">Zablokován</span>
-            <span v-else-if="u.mustChangePassword" class="badge badge-pending">Čeká na první přihlášení</span>
+            <span v-else-if="u.mustChangePassword" class="badge badge-pending">Čeká na změnu hesla</span>
             <span v-else class="badge badge-active">Aktivní</span>
+            <!-- Client-only: the time is formatted in the viewer's timezone,
+                 which the server-rendered HTML can't know, and whether it's
+                 still shown depends on the client's ticking clock. -->
+            <ClientOnly>
+              <span v-if="lockedUntil(u)" class="badge badge-locked">
+                Zamčeno do {{ formatTime(lockedUntil(u)!) }}
+              </span>
+            </ClientOnly>
             <span class="user-created">od {{ formatDate(u.createdAt) }}</span>
           </span>
         </div>
-        <button
-          type="button"
-          class="toggle-btn"
-          :disabled="togglingId === u.id"
-          @click="onToggleStatus(u)"
-        >
-          {{ u.status === 'blocked' ? 'Odblokovat' : 'Zablokovat' }}
-        </button>
+        <div class="user-actions">
+          <ClientOnly>
+            <button
+              v-if="lockedUntil(u)"
+              type="button"
+              class="toggle-btn"
+              :disabled="unlockingId === u.id"
+              @click="onUnlock(u)"
+            >
+              {{ unlockingId === u.id ? 'Odemykám…' : 'Odemknout' }}
+            </button>
+          </ClientOnly>
+          <button
+            type="button"
+            class="toggle-btn"
+            :disabled="resettingId === u.id"
+            @click="onResetPassword(u)"
+          >
+            {{ resettingId === u.id ? 'Resetuji…' : 'Resetovat heslo' }}
+          </button>
+          <button
+            type="button"
+            class="toggle-btn"
+            :disabled="togglingId === u.id"
+            @click="onToggleStatus(u)"
+          >
+            {{ u.status === 'blocked' ? 'Odblokovat' : 'Zablokovat' }}
+          </button>
+        </div>
       </div>
       <p v-if="users && !users.length" class="empty">Zatím žádní uživatelé kromě správce.</p>
     </div>
@@ -306,6 +410,7 @@ function formatDate(iso: string) {
   padding: 13px 16px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   border-left: 4px solid var(--easy);
@@ -316,6 +421,9 @@ function formatDate(iso: string) {
 }
 
 .user-main {
+  /* The basis is what makes the two action buttons drop to their own line
+     on a phone instead of squeezing the name and badge. */
+  flex: 1 1 180px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -342,6 +450,7 @@ function formatDate(iso: string) {
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 .badge-active {
@@ -354,6 +463,11 @@ function formatDate(iso: string) {
   color: var(--medium);
 }
 
+.badge-locked {
+  background: rgba(184, 80, 42, 0.14);
+  color: var(--accent);
+}
+
 .badge-blocked {
   background: rgba(161, 66, 58, 0.16);
   color: var(--hard);
@@ -362,6 +476,17 @@ function formatDate(iso: string) {
 .user-created {
   font-size: 11.5px;
   color: var(--surface-ink-dim);
+}
+
+.user-actions {
+  /* Shrinkable (not flex: none) so up to three buttons wrap inside the
+     card on a phone instead of overflowing it. */
+  flex: 0 1 auto;
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .toggle-btn {

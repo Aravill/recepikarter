@@ -1,5 +1,15 @@
 <script setup lang="ts">
+import { SESSION_END_MESSAGES, SESSION_ENDED_COOKIE } from '#shared/types/user'
+import type { SessionEndReason } from '#shared/types/user'
+
 const { fetch: refreshSession } = useUserSession()
+
+// Set by the server when it logged this browser out (blocked, password
+// changed, expired) — see endSession in server/utils/auth.ts.
+const sessionEndedReason = useCookie<SessionEndReason | null>(SESSION_ENDED_COOKIE)
+const sessionEndedNotice = computed(() =>
+  sessionEndedReason.value ? (SESSION_END_MESSAGES[sessionEndedReason.value] ?? '') : '',
+)
 
 const username = ref('')
 const password = ref('')
@@ -8,9 +18,12 @@ const submitting = ref(false)
 
 async function onSubmit() {
   error.value = ''
+  // The "why you were logged out" notice has done its job once they try
+  // again; leaving it next to a fresh error would be confusing.
+  sessionEndedReason.value = null
   submitting.value = true
   try {
-    await $fetch('/api/auth/login', {
+    await apiFetch('/api/auth/login', {
       method: 'POST',
       body: { username: username.value, password: password.value },
     })
@@ -29,6 +42,7 @@ async function onSubmit() {
   <div class="login-body">
     <img src="/banner.png" alt="Recepikarter — Kartotéka receptů" class="banner" />
     <form class="login-panel" @submit.prevent="onSubmit">
+      <p v-if="sessionEndedNotice" class="login-notice" role="status">{{ sessionEndedNotice }}</p>
       <div class="field">
         <label for="u">Uživatelské jméno</label>
         <input id="u" v-model="username" type="text" autocomplete="username" required />
@@ -103,6 +117,16 @@ async function onSubmit() {
 .field input:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.login-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(201, 138, 46, 0.14);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--surface-ink);
 }
 
 .login-error {

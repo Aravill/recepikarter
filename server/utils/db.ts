@@ -392,6 +392,11 @@ function findUserRowById(id: number): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
 }
 
+export function getUser(id: number): AppUser | undefined {
+  const row = findUserRowById(id)
+  return row ? rowToUser(row) : undefined
+}
+
 export function createUser(username: string, passwordHash: string): AppUser {
   const now = new Date().toISOString()
   // A freshly admin-created account always starts as must-change-password —
@@ -407,8 +412,7 @@ export function createUser(username: string, passwordHash: string): AppUser {
 export function setUserStatus(id: number, status: UserStatus): AppUser | undefined {
   const now = new Date().toISOString()
   db.prepare('UPDATE users SET status = ?, updated_at = ? WHERE id = ?').run(status, now, id)
-  const row = findUserRowById(id)
-  return row ? rowToUser(row) : undefined
+  return getUser(id)
 }
 
 // Also bumps session_version, so every other session of this user (another

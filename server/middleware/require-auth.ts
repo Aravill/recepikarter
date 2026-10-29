@@ -6,6 +6,11 @@ export default defineEventHandler(async (event) => {
     !path.startsWith('/api/shopping-lists') &&
     !path.startsWith('/api/meal-plans')
   ) {
+    // A full page load (not an asset or an API call) with a session that's
+    // been revoked since: end it here, see endStaleSession.
+    if (!path.startsWith('/api/') && getRequestHeader(event, 'accept')?.includes('text/html')) {
+      await endStaleSession(event)
+    }
     return
   }
 

@@ -6,23 +6,23 @@ export function useRecipes() {
   // this, the session cookie is missing and every call 401s server-side.
   const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined
 
-  const listRecipes = () => $fetch<Recipe[]>('/api/recipes', { headers })
-  const listTags = () => $fetch<string[]>('/api/recipes/tags', { headers })
-  const getRecipeById = (id: number) => $fetch<Recipe>(`/api/recipes/${id}`, { headers })
+  const listRecipes = () => apiFetch<Recipe[]>('/api/recipes', { headers })
+  const listTags = () => apiFetch<string[]>('/api/recipes/tags', { headers })
+  const getRecipeById = (id: number) => apiFetch<Recipe>(`/api/recipes/${id}`, { headers })
   const createRecipe = (input: RecipeInput) =>
-    $fetch<Recipe>('/api/recipes', { method: 'POST', body: input, headers })
+    apiFetch<Recipe>('/api/recipes', { method: 'POST', body: input, headers })
   const updateRecipe = (id: number, input: RecipeInput) =>
-    $fetch<Recipe>(`/api/recipes/${id}`, { method: 'PUT', body: input, headers })
-  const deleteRecipe = (id: number) => $fetch(`/api/recipes/${id}`, { method: 'DELETE', headers })
-  const markExported = (id: number) => $fetch<Recipe>(`/api/recipes/${id}/export`, { method: 'POST', headers })
+    apiFetch<Recipe>(`/api/recipes/${id}`, { method: 'PUT', body: input, headers })
+  const deleteRecipe = (id: number) => apiFetch(`/api/recipes/${id}`, { method: 'DELETE', headers })
+  const markExported = (id: number) => apiFetch<Recipe>(`/api/recipes/${id}/export`, { method: 'POST', headers })
   const uploadPhoto = (id: number, file: File) => {
     const body = new FormData()
     body.append('photo', file)
-    return $fetch<Recipe>(`/api/recipes/${id}/photo`, { method: 'POST', body, headers })
+    return apiFetch<Recipe>(`/api/recipes/${id}/photo`, { method: 'POST', body, headers })
   }
-  const deletePhoto = (id: number) => $fetch(`/api/recipes/${id}/photo`, { method: 'DELETE', headers })
+  const deletePhoto = (id: number) => apiFetch(`/api/recipes/${id}/photo`, { method: 'DELETE', headers })
   const importRecipes = (recipes: unknown[]) =>
-    $fetch<{ created: Recipe[]; skipped: { name: string; reason: string }[] }>('/api/recipes/import', {
+    apiFetch<{ created: Recipe[]; skipped: { name: string; reason: string }[] }>('/api/recipes/import', {
       method: 'POST',
       body: recipes,
       headers,

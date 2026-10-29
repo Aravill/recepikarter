@@ -2,10 +2,6 @@
 // app/pages/change-password.vue) and any later voluntary change — same
 // endpoint either way, gated only by requiring the current password.
 
-// The current-password check is a guessing oracle for whoever holds the
-// session (e.g. a stolen cookie), so it's throttled like login.
-const currentPasswordLimiter = createFailureLimiter({ maxFailures: 5, windowMs: 15 * 60 * 1000 })
-
 export default defineEventHandler(async (event) => {
   const { user } = await requireActiveSession(event)
 
@@ -29,7 +25,9 @@ export default defineEventHandler(async (event) => {
   const valid = await verifyPassword(row.password_hash, currentPassword)
   if (!valid) {
     currentPasswordLimiter.recordFailure(row.username)
-    throw createError({ statusCode: 401, statusMessage: 'Současné heslo není správné' })
+    // 400, not 401: the client treats any 401 as "session gone" and logs
+    // the tab out (see app/plugins/session-guard.client.ts).
+    throw createError({ statusCode: 400, statusMessage: 'Současné heslo není správné' })
   }
   currentPasswordLimiter.reset(row.username)
   if (newPassword === currentPassword) {

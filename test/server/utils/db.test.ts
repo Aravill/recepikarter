@@ -13,6 +13,7 @@ import {
   getMealPlan,
   getRecipe,
   getShoppingList,
+  getUser,
   listMealPlanSlots,
   listMealPlanTrayRecipeIds,
   listMealPlans,
@@ -206,6 +207,22 @@ describe('users db', () => {
     const row = findUserRowByUsername('novak-3')
     expect(row?.password_hash).toBe('new-hash')
     expect(row?.must_change_password).toBe(0)
+  })
+
+  it('looks a user up by id, without the password hash', () => {
+    const user = createUser('novak-5', 'hashed')
+    expect(getUser(user.id)).toEqual(user)
+    expect(getUser(user.id)).not.toHaveProperty('password_hash')
+    expect(getUser(999_999)).toBeUndefined()
+  })
+
+  it('puts a reset account back to must-change-password', () => {
+    const user = createUser('novak-6', 'hashed')
+    setUserPassword(user.id, 'own-hash', false)
+    expect(getUser(user.id)?.mustChangePassword).toBe(false)
+
+    setUserPassword(user.id, 'temp-hash', true)
+    expect(getUser(user.id)?.mustChangePassword).toBe(true)
   })
 
   it('bumps the session version on every password change', () => {

@@ -28,7 +28,7 @@ async function onSubmit() {
   }
   submitting.value = true
   try {
-    await $fetch('/api/auth/change-password', {
+    await apiFetch('/api/auth/change-password', {
       method: 'POST',
       body: { currentPassword: currentPassword.value, newPassword: newPassword.value },
     })
