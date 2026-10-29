@@ -63,11 +63,12 @@ export function createFailureLimiter(opts: {
   }
 }
 
-// The app runs behind a reverse proxy (see docker-compose.yml), so the
-// socket peer is always the proxy. Caddy overwrites X-Forwarded-For with the
-// real client address; the last entry is the one the nearest proxy added
-// either way. Only trustworthy because the app port isn't reachable except
-// through the proxy.
+// From the internet the app is only reached through the Caddy proxy, so the
+// socket peer is the proxy. Caddy overwrites X-Forwarded-For with the real
+// client address; the last entry is the one the nearest proxy added either
+// way. A client that can reach the app port directly (e.g. from the LAN,
+// since docker-compose.yml publishes it on all interfaces) can forge this
+// header — only the per-IP limit is affected, not the per-username one.
 export function clientIp(event: H3Event): string {
   const forwarded = getRequestHeader(event, 'x-forwarded-for')?.split(',').pop()?.trim()
   return forwarded || event.node.req.socket.remoteAddress || 'unknown'
